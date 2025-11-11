@@ -6,71 +6,114 @@ Transmission Expansion Planning (TEP) under load and renewable uncertainty using
 
 ```
 .
-├── data/                    # RTS-GMLC dataset
+├── data/                           # RTS-GMLC dataset
 │   └── RTS_Data/
-├── src/                     # Source code
-│   ├── data_loader.py      # Data loading utilities
-│   ├── dc_opf.py           # Baseline DC OPF model
-│   ├── tep.py              # Transmission Expansion Planning MILP
-│   ├── run_baseline.py     # Run baseline DC OPF
-│   └── run_tep.py          # Run TEP model
-├── requirements.txt         # Python dependencies
+│       ├── SourceData/            # Network data (buses, branches, generators)
+│       └── timeseries_data_files/ # Time series (load, wind, PV, hydro)
+├── src/                            # Source code
+│   ├── data_loader.py             # Load RTS-GMLC CSV files
+│   ├── timeseries_loader.py       # Load time series data
+│   ├── dc_opf.py                  # Baseline DC OPF model
+│   ├── tep.py                     # Single-period TEP MILP
+│   ├── multi_period_tep.py        # Full multi-period TEP
+│   ├── simplified_multi_period_tep.py  # Simplified multi-period TEP
+│   ├── tep_with_shedding.py       # TEP with load shedding
+│   ├── visualize.py               # Plotting utilities
+│   ├── run_baseline.py            # Run baseline DC OPF
+│   ├── run_tep.py                 # Run single-period TEP
+│   ├── run_multi_period_tep.py    # Run full multi-period TEP
+│   └── run_simplified_tep.py      # Run simplified multi-period TEP (recommended)
+├── results/                        # Output visualizations
+├── requirements.txt                # Python dependencies
+├── proposal.tex                   # Project proposal
+├── RESULTS.md                     # Detailed results report
 └── README.md
 ```
 
 ## Installation
 
-1. Install dependencies:
 ```bash
+# Create virtual environment
+python3 -m venv cme307
+source cme307/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Setup Gurobi license (if using Gurobi)
+export GRB_LICENSE_FILE="$(pwd)/gurobi.lic"
+# Or run: source setup_gurobi.sh
 ```
 
-2. Ensure Gurobi is installed and licensed (or use GLPK as alternative)
+**Requirements:**
+- Python 3.13+
+- Pyomo 6.9+
+- Gurobi 13.0+ (or GLPK as alternative)
+- pandas, numpy, matplotlib, networkx, scipy, scikit-learn
 
 ## Usage
 
-### Baseline DC OPF
-
-Run the baseline model (no expansion):
+### Baseline DC OPF (Static Load)
 ```bash
-cd src
-python run_baseline.py
+python src/run_baseline.py
 ```
+Deterministic DC power flow minimizing generation cost. No transmission expansion.
 
-### Transmission Expansion Planning
-
-Run the TEP MILP model:
+### Single-Period TEP
 ```bash
-cd src
-python run_tep.py
+python src/run_tep.py
 ```
+MILP with binary investment variables. Minimizes investment + operating cost.
 
-This will:
-1. Run baseline DC OPF
-2. Generate candidate transmission lines
-3. Solve TEP MILP to determine optimal expansion
-4. Compare results
+### Multi-Period TEP with Time Series (Recommended)
+```bash
+python src/run_simplified_tep.py
+```
+Two-stage approach: (1) Analyze time series to identify peak congestion periods, (2) Solve TEP for aggregated peak load scenario. Integrates hourly load profiles, wind/PV/hydro variability, and load participation factors.
 
 ## Models
 
 ### Baseline DC OPF
-- Deterministic DC power flow
-- Minimizes generation cost
-- No transmission expansion
+- **Objective**: Minimize generation cost
+- **Constraints**: Power balance, DC flow, generator limits, line thermal limits
+- **Solver**: Gurobi
 
 ### TEP MILP
-- Binary variables for line construction decisions
-- Minimizes investment + operating cost
-- DC power flow constraints
-- Thermal limits
+- **Objective**: Minimize investment cost + operating cost
+- **Decision Variables**: Binary variables for line construction
+- **Constraints**: DC power flow (Big-M formulation for candidate lines), thermal limits
+- **Solver**: Gurobi
+
+### Multi-Period TEP
+- **Methodology**: Two-stage approach with representative period selection (peak/avg/low or k-means)
+- **Features**: Time-varying load, renewable generation variability, load participation factors
+- **Solver**: Gurobi (GLPK fallback if needed)
+
+## Key Features
+
+- **Time Series Integration**: Hourly load, wind, PV, and hydro data
+- **Representative Period Selection**: Peak/avg/low method or k-means clustering
+- **Load Participation Factors**: Regional-to-bus load distribution
+- **Renewable Variability**: Time-varying capacity limits
+- **Automatic Candidate Generation**: Based on network topology
+- **Load Shedding Option**: Unserved energy with penalty costs
+- **Stress Testing**: Line outages and load growth scenarios
 
 ## Results
 
-The models output:
-- Total system cost
-- Investment costs
-- Operating costs
+See `RESULTS.md` for detailed analysis. Models output:
+- Total system cost (investment + operation)
+- Investment costs and payback period
+- Operating costs vs baseline
 - Lines to build
-- Congestion levels
-- Generation dispatch
+- Congestion frequency and severity
+- Period-by-period analysis
+- Robustness under uncertainty
+
+## References
+
+1. Garver, L. L. (1970). "Transmission network estimation using linear programming"
+2. Conejo et al. (2006). "Decomposition techniques in mathematical programming"
+3. Ruiz & Conejo (2015). "Robust transmission expansion planning"
+4. RTS-GMLC Dataset: https://github.com/GridMod/RTS-GMLC
 

@@ -1,5 +1,9 @@
 """
 Run Multi-Period Transmission Expansion Planning model
+
+NOTE: This script requires a full Gurobi license. For size-limited licenses,
+use 'run_simplified_tep.py' instead, which uses a two-stage approach that
+works within license limits.
 """
 import sys
 import os
@@ -70,15 +74,25 @@ def main():
     except Exception as e:
         if "too large" in str(e) or "license" in str(e).lower():
             print(f"\nGurobi license limit reached. Model size: {len(tep.periods)} periods, {len(tep.candidate_lines)} candidates")
-            print("Trying with even smaller model (3 periods, 8 candidates)...")
-            tep.prepare_time_series(n_periods=3)
-            tep.generate_candidate_lines(max_candidates=8)
-            tep.build_model()
+            print("Note: This script requires a full Gurobi license for multi-period models.")
+            print("Recommendation: Use 'run_simplified_tep.py' instead, which uses a two-stage approach")
+            print("that works within license limits.")
+            print("\nAttempting to reduce model size...")
+            # Reduce model size and rebuild
+            tep.periods = None  # Reset periods
+            tep.prepare_time_series(n_periods=2)  # Use only 2 periods
+            tep.generate_candidate_lines(max_candidates=5)  # Reduce to 5 candidates
+            tep.build_model()  # Rebuild with smaller size
             try:
+                print(f"Trying with reduced size: {len(tep.periods)} periods, {len(tep.candidate_lines)} candidates")
                 tep_success = tep.solve(solver='gurobi', time_limit=600)
-            except:
-                print("Still too large. Using GLPK (slower but no license limit)...")
-                tep_success = tep.solve(solver='glpk', time_limit=3600)
+            except Exception as e2:
+                if "too large" in str(e2) or "license" in str(e2).lower():
+                    print("\nModel still too large for Gurobi license.")
+                    print("Please use 'run_simplified_tep.py' which is designed to work within license limits.")
+                    tep_success = False
+                else:
+                    raise
         else:
             raise
     

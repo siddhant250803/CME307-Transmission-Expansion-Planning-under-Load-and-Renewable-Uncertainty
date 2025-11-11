@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project implements Transmission Expansion Planning (TEP) using the IEEE RTS-GMLC dataset. The goal is to determine optimal transmission line investments to minimize total system cost (investment + operation) while satisfying load demands and operational constraints.
+This project implements Transmission Expansion Planning (TEP) using the IEEE RTS-GMLC dataset. The goal is to determine optimal transmission line investments to minimize total system cost (investment + operation) while satisfying load demands and operational constraints. The model accounts for uncertainty in renewable generation and load, ensuring reliability under realistic variability.
 
 ## Models Implemented
 
@@ -17,6 +17,12 @@ This project implements Transmission Expansion Planning (TEP) using the IEEE RTS
 - **Decision Variables**: Binary variables for line construction (build/don't build)
 - **Constraints**: DC power flow (with Big-M formulation for candidate lines), thermal limits, power balance
 - **Solver**: Gurobi
+- **Status**: ✅ Implemented and validated
+
+### 3. Multi-Period TEP with Time Series
+- **Methodology**: Two-stage approach: (1) Analyze time series to identify peak congestion periods (peak/avg/low or k-means), (2) Solve TEP for aggregated peak load scenario
+- **Features**: Hourly load profiles, wind/PV/hydro variability, load participation factors
+- **Solver**: Gurobi (GLPK fallback if needed)
 - **Status**: ✅ Implemented and validated
 
 ## Results Summary
@@ -199,7 +205,7 @@ python src/run_simplified_tep.py
 - Python 3.13+
 - Pyomo 6.9+
 - Gurobi 13.0+ (or GLPK as alternative)
-- pandas, numpy, matplotlib, networkx, scipy
+- pandas, numpy, matplotlib, networkx, scipy, scikit-learn
 
 ## References
 
