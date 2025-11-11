@@ -1,0 +1,173 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\title{RTS-GMLC Dataset Description}
+\author{Reliability Test System -- Grid Modernization Lab Consortium}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Data Overview}
+
+RTS-GMLC is an updated RTS-96 test system for production cost modeling.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Component} & \textbf{Count} \\
+\midrule
+Regions & 3 \\
+Buses & 73 \\
+Transmission Lines (AC) & 120 \\
+HVDC Links & 1 \\
+Generators & 158 \\
+Storage Units & 23 \\
+\midrule
+Day-Ahead Time Series & 8,760 hours \\
+Real-Time Time Series & 105,120 intervals (5-min) \\
+\bottomrule
+\end{tabular}
+\caption{System characteristics}
+\end{table}
+
+\section{Network Data}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Component} & \textbf{File} & \textbf{Count} \\
+\midrule
+Buses (138/230 kV) & \texttt{bus.csv} & 73 \\
+AC Transmission Lines & \texttt{branch.csv} & 120 \\
+HVDC Link (Bus 113--316) & \texttt{dc\_branch.csv} & 1 \\
+\bottomrule
+\end{tabular}
+\caption{Network components}
+\end{table}
+
+\section{Generation}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Generator Type} & \textbf{Count} \\
+\midrule
+Combustion Turbine (CT) & 39 \\
+Rooftop PV (RTPV) & 31 \\
+Solar PV (Utility) & 25 \\
+Steam Plants & 23 \\
+Hydroelectric & 19 \\
+Combined Cycle (CC) & 10 \\
+Wind Farms & 4 \\
+Synchronous Condenser & 3 \\
+Storage & 1 \\
+CSP & 1 \\
+Nuclear & 1 \\
+Run-of-River (ROR) & 1 \\
+\midrule
+\textbf{Total} & \textbf{158} \\
+\bottomrule
+\end{tabular}
+\caption{Generator fleet}
+\end{table}
+
+Generator parameters include: capacity, ramp rates, startup costs, heat rate curves, fuel prices, emissions, reliability (FOR, MTTF, MTTR).
+
+\section{Storage \& Reserves}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Storage Type} & \textbf{Count} & \textbf{Capacity} \\
+\midrule
+CSP Thermal Storage & 1 & 1.2 GWh \\
+Hydro Reservoirs & 22 & 1.0 GWh each \\
+Battery Storage & 1 & 0.15 GWh \\
+\midrule
+\textbf{Total} & \textbf{23} & \\
+\bottomrule
+\end{tabular}
+\caption{Storage systems (\texttt{storage.csv})}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Reserve Product} & \textbf{Timeframe} & \textbf{Requirement} \\
+\midrule
+Regulation Up & 5 min & 72 MW \\
+Regulation Down & 5 min & 77 MW \\
+Spinning Reserve R1 & 10 min & 40.4 MW \\
+Spinning Reserve R2 & 10 min & 42.9 MW \\
+Spinning Reserve R3 & 10 min & 56.7 MW \\
+Flexibility Up & 20 min & 96 MW \\
+Flexibility Down & 20 min & 98 MW \\
+\bottomrule
+\end{tabular}
+\caption{Reserve products (\texttt{reserves.csv})}
+\end{table}
+
+\section{Time Series}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Type} & \textbf{Resolution} & \textbf{Periods} \\
+\midrule
+Day-Ahead & 1 hour & 8,760 \\
+Real-Time & 5 minutes & 105,120 \\
+\bottomrule
+\end{tabular}
+\caption{Time series resolution (Year 2020)}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Data Type} & \textbf{Directory} \\
+\midrule
+Load & \texttt{Load/} \\
+Wind & \texttt{WIND/} \\
+Solar PV & \texttt{PV/} \\
+Rooftop PV & \texttt{RTPV/} \\
+Hydro & \texttt{Hydro/} \\
+CSP & \texttt{CSP/} \\
+Reserves & \texttt{Reserves/} \\
+\bottomrule
+\end{tabular}
+\caption{Time series data files}
+\end{table}
+
+\section{Data Files}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{File} & \textbf{Component} & \textbf{Count} \\
+\midrule
+\texttt{bus.csv} & Buses & 73 \\
+\texttt{branch.csv} & AC Lines & 120 \\
+\texttt{gen.csv} & Generators & 158 \\
+\texttt{storage.csv} & Storage Units & 23 \\
+\texttt{dc\_branch.csv} & HVDC Links & 1 \\
+\texttt{reserves.csv} & Reserve Products & 7 \\
+\texttt{timeseries\_pointers.csv} & Time Series Mappings & 283 \\
+\bottomrule
+\end{tabular}
+\caption{Source data files (CSV format)}
+\end{table}
+
+Formatted data available for: MATPOWER, PLEXOS, PSS/E, PowerWorld, Prescient, pandapower, SIIP.
+
+\end{document}
+

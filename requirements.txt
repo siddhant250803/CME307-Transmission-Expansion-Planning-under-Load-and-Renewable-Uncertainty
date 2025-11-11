@@ -1,0 +1,8 @@
+pandas>=1.5.0
+numpy>=1.23.0
+pyomo>=6.5.0
+gurobipy>=10.0.0
+matplotlib>=3.6.0
+networkx>=2.8.0
+scipy>=1.9.0
+

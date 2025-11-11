@@ -1,0 +1,60 @@
+\documentclass[10pt]{article}
+
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue
+}
+
+\geometry{margin=0.75in}
+\setlength{\parskip}{0.3em}
+
+\title{CME307: Project Proposal\\Transmission Expansion Planning under Load and Renewable Uncertainty}
+
+\author{Edouard Rabasse, Siddhant Sukhani}
+
+\date{November 2025}
+
+\begin{document}
+
+\maketitle
+
+\section*{Problem Statement}
+
+Determine optimal transmission line investments to minimize total system cost (investment + operation) while satisfying load demands and operational constraints under uncertainty in renewable generation and load. The model will be implemented and tested using the IEEE RTS-GMLC dataset.
+
+\section*{Previous Work}
+
+Transmission Expansion Planning (TEP) has been studied since Garver's deterministic DC load flow formulation (1970). Modern approaches use mixed-integer linear programming (MILP) with stochastic and robust optimization to handle renewable and demand uncertainty (Conejo et al., 2006; Ruiz \& Conejo, 2015). The IEEE RTS-GMLC dataset provides a realistic benchmark with comprehensive time-series data.
+
+\section*{Data Overview}
+
+RTS-GMLC: 3 regions, 73 buses (138/230 kV), 120 AC lines, 1 HVDC link, 158 generators (39 CT, 31 RTPV, 25 PV, 23 Steam, 19 Hydro, 10 CC, 4 Wind, others), 23 storage units (CSP 1.2 GWh, 22 hydro 1 GWh each, 1 battery 0.15 GWh), 7 reserve products. Year-long time series: hourly (8,760) and 5-minute (105,120) resolution for load, wind, PV, hydro, CSP, and reserves. Generator parameters include capacity, ramp rates, startup costs, heat rate curves, fuel prices, emissions, and reliability metrics.
+
+\section*{Methodology}
+
+\textbf{Baseline:} Deterministic DC OPF (no expansion) using Gurobi. Output: total annual operating cost and congestion levels.
+
+\textbf{Expansion Model:} (1) Deterministic TEP MILP with binary investment variables; (2) Extend with stochastic/robust optimization for renewable/load uncertainty; (3) Constraints: DC power flow, thermal limits, optional N-1 security; (4) Objective: minimize investment + expected operating cost.
+
+\section*{Primary Metrics}
+
+Total system cost (investment + operation), unserved energy (MWh), congestion frequency/severity, investment cost savings vs. baseline, robustness under load/renewable uncertainty.
+
+\section*{Milestones}
+
+\textbf{Milestone A (T+7 days):} Load/validate RTS-GMLC data; implement DC OPF baseline and deterministic TEP MILP; produce baseline results and grid visualization.
+
+\textbf{Milestone B (T+14 days):} Extend with stochastic/robust uncertainty handling; run scenario analyses; final report with optimal build plan, sensitivity analysis, grid maps, and cost-benefit analysis.
+
+\section*{Risks and Mitigations}
+
+\textbf{Data complexity:} Validate units from RTS-GMLC README, cross-check with MATPOWER. \textbf{Solver scalability:} Use representative-hour clustering (k-means) and PTDF reformulation. \textbf{Model intractability:} Start deterministic, add uncertainty gradually with scenario reduction.
+
+\end{document}
+
