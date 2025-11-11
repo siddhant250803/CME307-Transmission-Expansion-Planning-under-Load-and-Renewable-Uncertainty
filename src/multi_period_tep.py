@@ -345,6 +345,13 @@ class MultiPeriodTEP(TEP):
             print("Feasible solution found (may not be optimal)")
             self.results = results
             return True
+        elif results.solver.termination_condition == TerminationCondition.infeasible:
+            print("Model is infeasible!")
+            print("Possible causes:")
+            print("  - Selected periods have incompatible load/generation patterns")
+            print("  - System cannot meet demand with available generation")
+            print("  - Consider using run_simplified_tep.py with load shedding option")
+            return False
         else:
             print(f"Solver termination: {results.solver.termination_condition}")
             return False

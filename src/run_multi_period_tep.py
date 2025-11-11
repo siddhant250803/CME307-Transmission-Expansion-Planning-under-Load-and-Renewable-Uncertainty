@@ -1,9 +1,13 @@
 """
 Run Multi-Period Transmission Expansion Planning model
 
-NOTE: This script requires a full Gurobi license. For size-limited licenses,
-use 'run_simplified_tep.py' instead, which uses a two-stage approach that
-works within license limits.
+NOTE: Gurobi WLS (Web License Service) academic licenses may have size limits
+on the number of constraints or nonzeros, even if variable limits are fine.
+This model creates ~3240 constraints and ~5980 nonzeros which may exceed
+some academic license limits.
+
+For size-limited licenses, use 'run_simplified_tep.py' instead, which uses
+a two-stage approach that works within license limits.
 """
 import sys
 import os
@@ -69,32 +73,51 @@ def main():
         tep.build_model()  # Rebuild with fewer candidates
     
     print("\nSolving Multi-Period TEP MILP...")
+    print(f"Model size: {len(tep.periods)} periods, {len(tep.candidate_lines)} candidates")
+    print(f"Estimated: ~{len(tep.periods) * (len(tep.model.generators) + len(tep.model.buses) + len(tep.model.branches) + len(tep.candidate_lines))} variables, ~{len(tep.periods) * 800} constraints\n")
+    
     try:
         tep_success = tep.solve(solver='gurobi', time_limit=1200)  # 20 minute limit
     except Exception as e:
-        if "too large" in str(e) or "license" in str(e).lower():
-            print(f"\nGurobi license limit reached. Model size: {len(tep.periods)} periods, {len(tep.candidate_lines)} candidates")
-            print("Note: This script requires a full Gurobi license for multi-period models.")
-            print("Recommendation: Use 'run_simplified_tep.py' instead, which uses a two-stage approach")
-            print("that works within license limits.")
-            print("\nAttempting to reduce model size...")
-            # Reduce model size and rebuild
-            tep.periods = None  # Reset periods
-            tep.prepare_time_series(n_periods=2)  # Use only 2 periods
-            tep.generate_candidate_lines(max_candidates=5)  # Reduce to 5 candidates
-            tep.build_model()  # Rebuild with smaller size
-            try:
-                print(f"Trying with reduced size: {len(tep.periods)} periods, {len(tep.candidate_lines)} candidates")
-                tep_success = tep.solve(solver='gurobi', time_limit=600)
-            except Exception as e2:
-                if "too large" in str(e2) or "license" in str(e2).lower():
-                    print("\nModel still too large for Gurobi license.")
-                    print("Please use 'run_simplified_tep.py' which is designed to work within license limits.")
-                    tep_success = False
-                else:
-                    raise
+        error_str = str(e).lower()
+        if "too large" in error_str or ("license" in error_str and "size" in error_str):
+            print(f"\n{'='*60}")
+            print("Gurobi License Issue Detected")
+            print(f"{'='*60}")
+            print(f"Model size: {len(tep.periods)} periods, {len(tep.candidate_lines)} candidates")
+            print("\nNOTE: Your Gurobi WLS academic license may have size restrictions.")
+            print("Even though variable/constraint counts may be within limits, the model")
+            print("complexity (MIP structure, Big-M constraints) may exceed license limits.")
+            print("\nRECOMMENDATION: Use 'run_simplified_tep.py' instead.")
+            print("It uses a two-stage approach that works reliably:")
+            print("  1. Identifies peak congestion periods")
+            print("  2. Solves TEP for aggregated peak load scenario")
+            print("  3. Includes load shedding for feasibility")
+            print("\nTo run the simplified version:")
+            print("  python src/run_simplified_tep.py")
+            print(f"{'='*60}\n")
+            tep_success = False
+        elif "infeasible" in error_str:
+            print(f"\n{'='*60}")
+            print("Model is Infeasible")
+            print(f"{'='*60}")
+            print("The model cannot satisfy all constraints simultaneously.")
+            print("This can happen when:")
+            print("  - Selected periods have incompatible load/generation patterns")
+            print("  - System cannot meet demand with available generation across all periods")
+            print("  - Renewable generation is too low in some periods")
+            print("\nRECOMMENDATION: Use 'run_simplified_tep.py' which includes:")
+            print("  - Load shedding option for feasibility")
+            print("  - Better period selection (peak periods only)")
+            print("  - Stress testing with targeted outages")
+            print("\nTo run the simplified version:")
+            print("  python src/run_simplified_tep.py")
+            print(f"{'='*60}\n")
+            tep_success = False
         else:
-            raise
+            print(f"\nUnexpected error: {e}")
+            print("Try using 'run_simplified_tep.py' for a more robust approach.")
+            tep_success = False
     
     if tep_success:
         tep.print_summary()
