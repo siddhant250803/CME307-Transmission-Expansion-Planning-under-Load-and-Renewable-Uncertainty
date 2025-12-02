@@ -84,7 +84,12 @@ This project implements Transmission Expansion Planning (TEP) using the IEEE RTS
 - Analyzed periods 1-12 to identify peak congestion
 - Load varies significantly: ~3,800-4,100 MW across analyzed periods
 - **Period Feasibility**:
-  - Periods 1-6: Infeasible (likely due to low renewable generation during early morning hours)
+  - Periods 1-6: Infeasible due to **minimum generation constraints exceeding load**
+    - Root cause: Total minimum generation (3,775 MW) > Total load (3,400-3,800 MW)
+    - Excess minimum generation: ~371 MW
+    - Even with 50% load reduction, periods remain infeasible
+    - Solution: Allow load shedding or reduce minimum generation constraints
+    - See `results/infeasibility_analysis_summary.md` for detailed analysis
   - Periods 7-12: Feasible with successful DC OPF solutions
   - Period 7: Load = 3,857.1 MW, 0 congested branches
   - Period 8: Load = 3,911.3 MW, 0 congested branches

@@ -1,0 +1,29 @@
+
+Gurobi 13.0.0 (mac64[arm]) logging started Mon Dec  1 17:38:38 2025
+
+Set parameter LogFile to value "results/infeasibility_analysis/iis_period_5.log"
+Gurobi Optimizer version 13.0.0 build v13.0.0rc1 (mac64[arm] - Darwin 24.6.0 24G90)
+
+CPU model: Apple M1 Pro
+Thread count: 8 physical cores, 8 logical processors, using up to 8 threads
+
+Non-default parameters:
+IISMethod  1
+
+Optimize a model with 750 rows, 351 columns and 1315 nonzeros (Min)
+Model fingerprint: 0x95808b07
+Model has 73 linear objective coefficients
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+02]
+  Objective range  [8e+00, 2e+02]
+  Bounds range     [0e+00, 0e+00]
+  RHS range        [4e+00, 8e+02]
+Presolve removed 652 rows and 190 columns
+Presolve time: 0.00s
+Presolved: 98 rows, 161 columns, 520 nonzeros
+
+Iteration    Objective       Primal Inf.    Dual Inf.      Time
+       0      handle free variables                          0s
+
+Solved in 64 iterations and 0.00 seconds (0.00 work units)
+Infeasible model
