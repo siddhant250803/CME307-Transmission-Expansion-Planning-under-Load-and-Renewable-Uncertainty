@@ -85,7 +85,7 @@ This project implements Transmission Expansion Planning (TEP) using the IEEE RTS
 - Load varies significantly: ~3,800-4,100 MW across analyzed periods
 - **Period Feasibility**:
   - Periods 1-6: Infeasible due to **minimum generation constraints exceeding load**
-    - Root cause: Total minimum generation (3,775 MW) > Total load (3,400-3,800 MW)
+    - Root cause: Total minimum generation (3,775 MW) > Total load (3,400-3,700 MW)
     - Excess minimum generation: ~371 MW
     - Even with 50% load reduction, periods remain infeasible
     - Solution: Allow load shedding or reduce minimum generation constraints
