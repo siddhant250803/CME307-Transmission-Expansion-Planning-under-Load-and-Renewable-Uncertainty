@@ -43,6 +43,34 @@ This project implements Transmission Expansion Planning (TEP) using the IEEE RTS
 - **Lines Built**: 0
 - **Finding**: No expansion needed with static load scenario
 
+### Cost Sensitivity Analysis
+
+**Methodology**:
+- Swept line cost parameter from $100k to $1M per MW (10 points on logarithmic scale)
+- Tested each cost level with TEP model using static load scenario
+- Baseline operating cost: $138,966.59
+- Analyzed break-even point where expansion becomes attractive
+
+**Results**:
+- **All cost levels tested**: No expansion built (0 lines)
+- **Cost range tested**: $100,000 - $1,000,000 per MW
+- **Operating cost**: Constant at $138,966.59 (no savings from expansion)
+- **Net benefit**: $0 at all cost levels
+- **Key Insight**: System has no congestion that expansion can economically relieve under static load
+
+**Cost Model Comparison** (for 500MW, 100-mile, 230kV line):
+- **Capacity-Distance Model** (original): $804.7M
+  - Formula: `cost = $1M/MW × 500MW × (160.9km / 100km)`
+  - Note: This model double-counts capacity and distance
+- **Distance-Based Model** (realistic): $150M
+  - Formula: `cost = $1.5M/mile × 100 miles` (for 230kV)
+  - Based on MISO/FERC industry data
+- **Capacity-Only Model**: $100M
+  - Formula: `cost = $200k/MW × 500MW`
+  - Ignores distance, simpler but less accurate
+
+**Recommendation**: Use distance-based model for realistic cost estimation, or run sensitivity analysis to find cost thresholds.
+
 ### Multi-Period TEP with Time Series Data
 
 **Methodology**: 
@@ -106,12 +134,16 @@ This project implements Transmission Expansion Planning (TEP) using the IEEE RTS
    - Note: Some early periods (1-6) are infeasible, likely due to low renewable generation during those hours
 
 3. **Expansion Economics**:
-   - With line costs of $200k-$500k per MW, expansion not justified
+   - **Cost Sensitivity Analysis**: Tested line costs from $100k-$1M per MW (10 points on log scale)
+   - **Result**: No expansion built at any cost level tested
+   - **Finding**: Even at very low costs ($100k/MW), expansion not economically justified
    - System has sufficient capacity margin for current and near-term future loads
+   - Operating cost savings from expansion are negligible (baseline = $138,966.59)
    - Expansion would be beneficial if:
      - Load growth exceeds 50% of current peak
-     - Investment costs decrease significantly
+     - Investment costs decrease significantly (<$100k/MW)
      - New large load centers are added (>500 MW)
+     - Significant congestion exists that expansion can relieve
 
 4. **Network Characteristics**:
    - 73 buses across 3 regions
@@ -134,7 +166,7 @@ src/
 ├── data_loader.py              # Load RTS-GMLC CSV files
 ├── timeseries_loader.py        # Load time series data (load, wind, PV, hydro)
 ├── dc_opf.py                  # Baseline DC OPF model
-├── tep.py                     # Single-period TEP MILP model
+├── tep.py                     # Single-period TEP MILP model (with multiple cost models)
 ├── multi_period_tep.py        # Full multi-period TEP (large-scale)
 ├── simplified_multi_period_tep.py  # Simplified multi-period TEP (works within license limits)
 ├── tep_with_shedding.py       # TEP with load shedding option
@@ -142,7 +174,9 @@ src/
 ├── run_baseline.py            # Run baseline model
 ├── run_tep.py                 # Run single-period TEP
 ├── run_multi_period_tep.py    # Run full multi-period TEP
-└── run_simplified_tep.py      # Run simplified multi-period TEP (recommended)
+├── run_simplified_tep.py      # Run simplified multi-period TEP (recommended)
+├── run_cost_sensitivity.py    # Cost sensitivity analysis (sweep cost parameters)
+└── example_cost_models.py     # Compare different cost calculation models
 ```
 
 ### Key Features
@@ -155,6 +189,11 @@ src/
 - **Load Shedding Option**: Allows unserved energy with penalty cost for feasibility
 - **Stress Testing**: Simulates line outages and load growth scenarios
 - **DC Power Flow**: Computational efficiency for large-scale problems
+- **Multiple Cost Models**: 
+  - Capacity-distance model (original)
+  - Distance-based model (realistic, uses MISO/FERC data)
+  - Capacity-only model (simplified)
+- **Cost Sensitivity Analysis**: Sweep cost parameters to find break-even points
 - **Modular Design**: Easy extension to stochastic/robust optimization
 
 ## Implementation Highlights
@@ -176,7 +215,13 @@ src/
    - Simulated line outages for stress testing
    - Targeted congestion relief analysis
 
-4. **Visualization** ✅
+4. **Cost Analysis** ✅
+   - Multiple cost models (capacity-distance, distance-based, capacity-only)
+   - Cost sensitivity analysis with parameter sweeping
+   - Break-even point identification
+   - Realistic cost calibration using MISO/FERC data
+
+5. **Visualization** ✅
    - Network topology plots with congestion highlighting
    - Congestion bar charts
    - Generation mix pie charts

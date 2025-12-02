@@ -9,7 +9,8 @@ from data_loader import RTSDataLoader
 class TEP:
     """Transmission Expansion Planning model"""
     
-    def __init__(self, data_loader, candidate_lines=None, line_cost_per_mw=1000000):
+    def __init__(self, data_loader, candidate_lines=None, line_cost_per_mw=1000000, 
+                 cost_model='capacity_distance'):
         """
         Initialize TEP model
         
@@ -23,9 +24,16 @@ class TEP:
             If None, generates candidates based on existing network
         line_cost_per_mw : float
             Cost per MW of new line capacity (default: $1M/MW)
+            Used for 'capacity_distance' model: cost = line_cost_per_mw * capacity * (dist/100)
+        cost_model : str
+            Cost calculation model:
+            - 'capacity_distance': cost = line_cost_per_mw * capacity * (dist/100) [current]
+            - 'distance_based': cost = cost_per_mile * distance_miles (more realistic)
+            - 'capacity_only': cost = line_cost_per_mw * capacity (ignores distance)
         """
         self.data = data_loader
         self.line_cost_per_mw = line_cost_per_mw
+        self.cost_model = cost_model
         self.candidate_lines = candidate_lines
         self.model = None
         self.results = None
@@ -67,17 +75,19 @@ class TEP:
                     else:
                         capacity = 200  # MW
                     
-                    # Estimate cost based on distance (simplified)
-                    # Use geographic distance if available
+                    # Calculate distance
                     if 'lat' in buses.columns and 'lng' in buses.columns:
                         lat1, lng1 = buses.loc[bus1, 'lat'], buses.loc[bus1, 'lng']
                         lat2, lng2 = buses.loc[bus2, 'lat'], buses.loc[bus2, 'lng']
                         # Rough distance estimate (degrees to km approximation)
-                        dist = np.sqrt((lat1-lat2)**2 + (lng1-lng2)**2) * 111  # km
+                        dist_km = np.sqrt((lat1-lat2)**2 + (lng1-lng2)**2) * 111  # km
+                        dist_miles = dist_km * 0.621371  # Convert to miles
                     else:
-                        dist = 50  # Default distance
+                        dist_km = 50  # Default distance
+                        dist_miles = dist_km * 0.621371
                     
-                    cost = self.line_cost_per_mw * capacity * (dist / 100.0)  # Scale by distance
+                    # Calculate cost based on selected model
+                    cost = self._calculate_line_cost(capacity, dist_miles, base_kv)
                     
                     candidates.append({
                         'from_bus': bus1,
@@ -96,6 +106,56 @@ class TEP:
         self.candidate_lines = candidates
         print(f"Generated {len(candidates)} candidate lines")
         return candidates
+    
+    def _calculate_line_cost(self, capacity_mw, distance_miles, voltage_kv):
+        """
+        Calculate transmission line cost based on selected model
+        
+        Parameters:
+        -----------
+        capacity_mw : float
+            Line capacity in MW
+        distance_miles : float
+            Line distance in miles
+        voltage_kv : float
+            Line voltage in kV
+        
+        Returns:
+        --------
+        cost : float
+            Total line cost in dollars
+        """
+        if self.cost_model == 'capacity_distance':
+            # Original model: cost = line_cost_per_mw * capacity * (dist/100)
+            # Note: This scales distance by 100km, so dist_miles converted to km
+            dist_km = distance_miles / 0.621371
+            cost = self.line_cost_per_mw * capacity_mw * (dist_km / 100.0)
+        
+        elif self.cost_model == 'distance_based':
+            # More realistic: cost per mile varies by voltage
+            # Based on MISO/FERC data: 230kV ~$1.5M/mile, 345kV ~$2.5M/mile, 500kV ~$4M/mile
+            cost_per_mile = {
+                138: 1.0e6,   # $1M/mile for 138kV
+                230: 1.5e6,   # $1.5M/mile for 230kV
+                345: 2.5e6,   # $2.5M/mile for 345kV
+                500: 4.0e6,   # $4M/mile for 500kV
+                765: 6.0e6    # $6M/mile for 765kV
+            }
+            # Find closest voltage level
+            voltage_levels = sorted(cost_per_mile.keys())
+            closest_voltage = min(voltage_levels, key=lambda v: abs(v - voltage_kv))
+            cost = cost_per_mile[closest_voltage] * distance_miles
+        
+        elif self.cost_model == 'capacity_only':
+            # Simple: cost = line_cost_per_mw * capacity (ignores distance)
+            cost = self.line_cost_per_mw * capacity_mw
+        
+        else:
+            # Default to capacity_distance
+            dist_km = distance_miles / 0.621371
+            cost = self.line_cost_per_mw * capacity_mw * (dist_km / 100.0)
+        
+        return cost
     
     def build_model(self):
         """Build TEP MILP model"""
