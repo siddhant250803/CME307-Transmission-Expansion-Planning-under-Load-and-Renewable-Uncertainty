@@ -7,6 +7,7 @@
 \usepackage{siunitx}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{todonotes}
 
 \hypersetup{
     colorlinks=true,
@@ -15,7 +16,7 @@
     citecolor=black
 }
 
-\geometry{margin=0.8in}
+% \geometry{margin=0.8in}
 \setlength{\parskip}{0.4em}
 
 \sisetup{
@@ -47,16 +48,15 @@
 \end{abstract}
 
 \section{Introduction}
-This project follows the goals laid out in our project proposal (\texttt{report/proposal.tex}): evaluate how transmission expansion decisions change when we move beyond a static DC-OPF benchmark to multi-period and robust formulations on the IEEE RTS-GMLC system. We draw on classic TEP literature for deterministic formulations~\cite{garver1970,conejo2006} and recent work on robustness under uncertainty~\cite{ruiz2015}. The central question is whether the congestion we see in the RTS-GMLC snapshot, or the uncertainty we model around it, is enough to justify building new lines.
+This project follows the goals laid out in our project proposal : evaluate how transmission expansion decisions change when we move beyond a static DC-OPF benchmark to multi-period and robust formulations on the IEEE RTS-GMLC system. We draw on classic TEP literature for deterministic formulations~\cite{garver1970,conejo2006} and recent work on robustness under uncertainty~\cite{ruiz2015}. The central question is whether the congestion we see in the RTS-GMLC snapshot, or the uncertainty we model around it, is enough to justify building new lines.
 
 Our approach is staged so the goal stays visible as we increase model complexity:
 \begin{itemize}
-    \item Baseline DC-OPF and single-period TEP: if congestion alone were binding, the MILP would build.
+    \item Baseline DC-OPF and single-period TEP: if congestion alone were binding, the MILP would build.\todo{missing words}
     \item Cost and time-series stress: cheaper capital and stressed representative hours test whether economics or timing flip the decision.
     \item Scarcity pricing: a load-shedding variant converts shortages into dollars.
     \item Robust TEP: one build plan must satisfy simultaneous stressors; this is the final hurdle that could force expansion.
 \end{itemize}
-Each step answers ``why build?'' under stronger assumptions; we only escalate when the simpler setting still declines to invest.
 
 \section{Data and Modeling Approach}
 We rely on the RTS-GMLC static network (73 buses, 120 AC branches, 158 generators) and its hourly
@@ -174,7 +174,7 @@ Since cheaper capital still did not trigger expansion, we turned to time-varying
 \end{enumerate}
 
 \section{Supply Shortage Stress Test}\label{sec:loadshed}
-The early representative-period runs expose feasibility tension in low-load hours because of minimum generation limits. Rather than ignore shortage, we price it explicitly. We created
+The early representative-period runs expose feasibility tension in low-load hours because of minimum generation limits. Rather than ignore shortage, we price it explicitly. We created \todo{it is too long}
 \texttt{src/scripts/run\_load\_shedding\_analysis.py}, which reuses the TEP formulation but disables candidate builds
 and adds non-negative \texttt{load\_shed} variables with a \$50k/MWh penalty. For each day-ahead period we derate all
 generators to 20\% of P\textsubscript{max} and scale nodal load by 40\%. The optimizer maxes out the remaining 2910~MW
@@ -215,7 +215,7 @@ simultaneously. Each scenario applies its own load factor, renewable availabilit
 while sharing the investment vector. Table~\ref{tab:robust-scenarios} lists the scenarios used in
 \texttt{src/scripts/run\_robust\_tep.py}.
 
-\section{Script-by-Script Insights}
+\section{Script-by-Script Insights} \todo{check that the description is correct}
 The entry-point scripts mirror the staged storyline above, from deterministic baselines to stressed and robust formulations. Briefly:
 \begin{itemize}
     \item \texttt{run\_baseline.py} solves a linear DC-OPF on the fixed grid to check feasibility and congestion. Result: all load served, three 500~MW interties at 100\% loading, no investment option enabled.
@@ -226,7 +226,7 @@ The entry-point scripts mirror the staged storyline above, from deterministic ba
     \item \texttt{run\_load\_shedding\_analysis.py} disables building and adds load-shed slacks with a \$50k/MWh penalty, while derating generators to 20\% of nameplate and scaling load by 40\%. Result: 37--43\% of demand is shed (penalty \$88--\$110M per period), giving a price tag for scarcity.
     \item \texttt{run\_robust\_tep.py} enforces one build plan across three scenarios (nominal; high-load/low-renewable with intertie derates on A27/CA-1/CB-1; low-load/high-renewable), with softened line cost \$120k/MW. Result: two 200~MW links (101–106, 101–117) are built to keep every scenario feasible; scenario metrics are saved to \texttt{results/robust\_tep\_summary.csv}.
 \end{itemize}
-WLS size constraint: Gurobi’s Web License Service for academics can reject models once rows/columns/nonzeros exceed the allowance set by the license (often on the order of a few to tens of thousands matrix coefficients). The multi-period MILP grows with \#periods \(\times\) (\#buses + \#generators + \#branches + \#candidates); reducing periods or candidates, or using the simplified two-stage script, keeps the model inside those limits.
+\todo{are we sure that we hit the constraint?}WLS size constraint: Gurobi’s Web License Service for academics can reject models once rows/columns/nonzeros exceed the allowance set by the license (often on the order of a few to tens of thousands matrix coefficients). The multi-period MILP grows with \#periods \(\times\) (\#buses + \#generators + \#branches + \#candidates); reducing periods or candidates, or using the simplified two-stage script, keeps the model inside those limits.
 
 \begin{table}[h]
     \centering
