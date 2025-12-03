@@ -3,16 +3,18 @@ Run TEP with cost sensitivity analysis
 Sweeps over different line cost parameters to see when expansion becomes attractive
 """
 import sys
-import os
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data_loader import RTSDataLoader
-from src.dc_opf import DCOPF
-from src.tep import TEP
+from src.core.data_loader import RTSDataLoader
+from src.core.dc_opf import DCOPF
+from src.core.tep import TEP
 
 def run_cost_sensitivity():
     """Run TEP for different cost parameters"""

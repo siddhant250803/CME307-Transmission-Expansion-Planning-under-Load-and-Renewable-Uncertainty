@@ -10,16 +10,17 @@ For size-limited licenses, use 'run_simplified_tep.py' instead, which uses
 a two-stage approach that works within license limits.
 """
 import sys
-import os
+from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data_loader import RTSDataLoader
-from src.dc_opf import DCOPF
-from src.timeseries_loader import TimeseriesLoader
-from src.multi_period_tep import MultiPeriodTEP
+from src.core.data_loader import RTSDataLoader
+from src.core.dc_opf import DCOPF
+from src.core.timeseries_loader import TimeseriesLoader
+from src.core.multi_period_tep import MultiPeriodTEP
 
 def main():
     print("="*60)
@@ -94,7 +95,7 @@ def main():
             print("  2. Solves TEP for aggregated peak load scenario")
             print("  3. Includes load shedding for feasibility")
             print("\nTo run the simplified version:")
-            print("  python src/run_simplified_tep.py")
+            print("  python src/scripts/run_simplified_tep.py")
             print(f"{'='*60}\n")
             tep_success = False
         elif "infeasible" in error_str:
@@ -111,7 +112,7 @@ def main():
             print("  - Better period selection (peak periods only)")
             print("  - Stress testing with targeted outages")
             print("\nTo run the simplified version:")
-            print("  python src/run_simplified_tep.py")
+            print("  python src/scripts/run_simplified_tep.py")
             print(f"{'='*60}\n")
             tep_success = False
         else:

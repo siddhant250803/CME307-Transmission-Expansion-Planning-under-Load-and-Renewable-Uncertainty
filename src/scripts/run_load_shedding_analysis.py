@@ -13,17 +13,19 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data_loader import RTSDataLoader
-from src.timeseries_loader import TimeseriesLoader
-from src.tep_with_shedding import TEPWithLoadShedding
+from src.core.data_loader import RTSDataLoader
+from src.core.timeseries_loader import TimeseriesLoader
+from src.core.tep_with_shedding import TEPWithLoadShedding
 
 
 @dataclass

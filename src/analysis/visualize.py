@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import networkx as nx
-from data_loader import RTSDataLoader
+from src.core.data_loader import RTSDataLoader
 
 def plot_network(data_loader, results=None, save_path=None):
     """Plot the power network"""
@@ -165,8 +165,8 @@ if __name__ == '__main__':
     # Add parent directory to path
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
-    from src.data_loader import RTSDataLoader
-    from src.dc_opf import DCOPF
+    from src.core.data_loader import RTSDataLoader
+    from src.core.dc_opf import DCOPF
     
     print("="*60)
     print("CME307: Transmission Expansion Planning Visualizations")

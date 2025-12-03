@@ -5,9 +5,15 @@ from __future__ import annotations
 
 import csv
 import os
+import sys
+from pathlib import Path
 
-from data_loader import RTSDataLoader
-from scenario_robust_tep import Scenario, ScenarioRobustTEP
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.core.data_loader import RTSDataLoader
+from src.core.scenario_robust_tep import Scenario, ScenarioRobustTEP
 
 
 def main():

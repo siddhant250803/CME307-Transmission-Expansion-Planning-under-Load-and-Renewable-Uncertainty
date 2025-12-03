@@ -5,8 +5,8 @@ This makes expansion more attractive by allowing comparison of expansion cost vs
 from pyomo.environ import *
 import pandas as pd
 import numpy as np
-from data_loader import RTSDataLoader
-from tep import TEP
+from .data_loader import RTSDataLoader
+from .tep import TEP
 
 class TEPWithLoadShedding(TEP):
     """TEP model that allows load shedding with high penalty cost"""

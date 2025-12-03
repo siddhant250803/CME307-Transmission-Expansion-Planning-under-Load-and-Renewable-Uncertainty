@@ -6,28 +6,36 @@ Transmission Expansion Planning (TEP) under load and renewable uncertainty using
 
 ```
 .
-├── data/                           # RTS-GMLC dataset
-│   └── RTS_Data/
-│       ├── SourceData/            # Network data (buses, branches, generators)
-│       └── timeseries_data_files/ # Time series (load, wind, PV, hydro)
-├── src/                            # Source code
-│   ├── data_loader.py             # Load RTS-GMLC CSV files
-│   ├── timeseries_loader.py       # Load time series data
-│   ├── dc_opf.py                  # Baseline DC OPF model
-│   ├── tep.py                     # Single-period TEP MILP
-│   ├── multi_period_tep.py        # Full multi-period TEP
-│   ├── simplified_multi_period_tep.py  # Simplified multi-period TEP
-│   ├── tep_with_shedding.py       # TEP with load shedding
-│   ├── visualize.py               # Plotting utilities
-│   ├── run_baseline.py            # Run baseline DC OPF
-│   ├── run_tep.py                 # Run single-period TEP
-│   ├── run_multi_period_tep.py    # Run full multi-period TEP
-│   └── run_simplified_tep.py      # Run simplified multi-period TEP (recommended)
-├── results/                        # Output visualizations
-├── requirements.txt                # Python dependencies
-├── proposal.tex                   # Project proposal
-├── RESULTS.md                     # Detailed results report
-└── README.md
+|-- data/
+|   `-- RTS_Data/
+|       |-- SourceData/               # Network data (buses, branches, generators)
+|       `-- timeseries_data_files/    # Time series (load, wind, PV, hydro)
+|-- src/
+|   |-- core/                        # Models and data utilities
+|   |   |-- data_loader.py
+|   |   |-- timeseries_loader.py
+|   |   |-- dc_opf.py
+|   |   |-- tep.py
+|   |   |-- multi_period_tep.py
+|   |   |-- simplified_multi_period_tep.py
+|   |   |-- scenario_robust_tep.py
+|   |   |-- tep_with_shedding.py
+|   |   `-- example_cost_models.py
+|   |-- analysis/                    # Diagnostics and plotting
+|   |   |-- analyze_infeasibility.py
+|   |   `-- visualize.py
+|   `-- scripts/                     # Entry points
+|       |-- run_baseline.py
+|       |-- run_tep.py
+|       |-- run_multi_period_tep.py
+|       |-- run_simplified_tep.py
+|       |-- run_load_shedding_analysis.py
+|       |-- run_cost_sensitivity.py
+|       `-- run_robust_tep.py
+|-- results/                         # Output visualizations and tables
+|-- requirements.txt
+|-- RESULTS.md
+`-- README.md
 ```
 
 ## Installation
@@ -55,21 +63,45 @@ export GRB_LICENSE_FILE="$(pwd)/gurobi.lic"
 
 ### Baseline DC OPF (Static Load)
 ```bash
-python src/run_baseline.py
+python src/scripts/run_baseline.py
 ```
 Deterministic DC power flow minimizing generation cost. No transmission expansion.
 
 ### Single-Period TEP
 ```bash
-python src/run_tep.py
+python src/scripts/run_tep.py
 ```
 MILP with binary investment variables. Minimizes investment + operating cost.
 
-### Multi-Period TEP with Time Series (Recommended)
+### Multi-Period TEP with Time Series (Simplified, Recommended)
 ```bash
-python src/run_simplified_tep.py
+python src/scripts/run_simplified_tep.py
 ```
 Two-stage approach: (1) Analyze time series to identify peak congestion periods, (2) Solve TEP for aggregated peak load scenario. Integrates hourly load profiles, wind/PV/hydro variability, and load participation factors.
+
+### Full Multi-Period TEP (License Permitting)
+```bash
+python src/scripts/run_multi_period_tep.py
+```
+Direct MILP across representative periods; may exceed academic WLS limits.
+
+### Load Shedding Stress Test
+```bash
+python src/scripts/run_load_shedding_analysis.py
+```
+Derates generators, scales load, and reports unserved energy and its cost.
+
+### Cost Sensitivity Sweep
+```bash
+python src/scripts/run_cost_sensitivity.py
+```
+Sweeps line-cost parameters to see when expansion becomes attractive.
+
+### Scenario-Based Robust TEP
+```bash
+python src/scripts/run_robust_tep.py
+```
+Single build plan that must satisfy multiple load/renewable/outage scenarios; saves summary to `results/robust_tep_summary.csv`.
 
 ## Models
 
@@ -89,6 +121,11 @@ Two-stage approach: (1) Analyze time series to identify peak congestion periods,
 - **Features**: Time-varying load, renewable generation variability, load participation factors
 - **Solver**: Gurobi (GLPK fallback if needed)
 
+### Scenario-Based Robust TEP
+- **Objective**: Minimize weighted operating cost across scenarios with shared build decisions
+- **Features**: Load/renewable scaling per scenario, branch derating, scenario weights
+- **Solver**: Gurobi
+
 ## Key Features
 
 - **Time Series Integration**: Hourly load, wind, PV, and hydro data
@@ -98,6 +135,7 @@ Two-stage approach: (1) Analyze time series to identify peak congestion periods,
 - **Automatic Candidate Generation**: Based on network topology
 - **Load Shedding Option**: Unserved energy with penalty costs
 - **Stress Testing**: Line outages and load growth scenarios
+- **Robust Optimization**: Scenario-based formulation with shared investment plan
 
 ## Results
 

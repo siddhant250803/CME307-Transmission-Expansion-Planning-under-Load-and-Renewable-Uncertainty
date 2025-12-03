@@ -125,7 +125,7 @@ This project implements Transmission Expansion Planning (TEP) using the IEEE RTS
 
 Reviewer question (a) asked how we handle periods where load exceeds available supply.  
 We implemented a DC-OPF variant with explicit load shedding using `TEPWithLoadShedding`
-and created the runnable script `src/run_load_shedding_analysis.py`.  
+and created the runnable script `src/scripts/run_load_shedding_analysis.py`.  
 Each run temporarily (i) derates every generator to 20% of its nameplate capacity, (ii) scales nodal loads by 40%,
 and (iii) enforces a \$50k/MWh penalty on unserved energy. This combination creates an acute shortage
 that forces the model to use the `load_shed` slack variables. The script prints the period-by-period summary
@@ -151,7 +151,7 @@ and discuss how different penalty levels or derating assumptions affect the amou
 ### Scenario-Based Robust TEP
 
 To answer reviewer question (b) about robustness, we prototyped a scenario-based formulation
-(`src/scenario_robust_tep.py`) and a driver script `src/run_robust_tep.py`. We defined three scenarios:
+(`src/core/scenario_robust_tep.py`) and a driver script `src/scripts/run_robust_tep.py`. We defined three scenarios:
 
 | Scenario | Load scale | Renewable scale | Branch stress | Weight | Description |
 | --- | --- | --- | --- | --- | --- |
@@ -220,23 +220,11 @@ single-scenario runs where no new lines were needed.
 ## Technical Implementation
 
 ### Data Structure
-```
-src/
-├── data_loader.py              # Load RTS-GMLC CSV files
-├── timeseries_loader.py        # Load time series data (load, wind, PV, hydro)
-├── dc_opf.py                  # Baseline DC OPF model
-├── tep.py                     # Single-period TEP MILP model (with multiple cost models)
-├── multi_period_tep.py        # Full multi-period TEP (large-scale)
-├── simplified_multi_period_tep.py  # Simplified multi-period TEP (works within license limits)
-├── tep_with_shedding.py       # TEP with load shedding option
-├── visualize.py               # Plotting utilities
-├── run_baseline.py            # Run baseline model
-├── run_tep.py                 # Run single-period TEP
-├── run_multi_period_tep.py    # Run full multi-period TEP
-├── run_simplified_tep.py      # Run simplified multi-period TEP (recommended)
-├── run_cost_sensitivity.py    # Cost sensitivity analysis (sweep cost parameters)
-└── example_cost_models.py     # Compare different cost calculation models
-```
+- src/
+  - core/ (models and data utilities: data_loader.py, timeseries_loader.py, dc_opf.py, tep.py, multi_period_tep.py, simplified_multi_period_tep.py, scenario_robust_tep.py, tep_with_shedding.py, example_cost_models.py)
+  - analysis/ (diagnostics and plotting: analyze_infeasibility.py, visualize.py)
+  - scripts/ (entry points: run_baseline.py, run_tep.py, run_multi_period_tep.py, run_simplified_tep.py, run_load_shedding_analysis.py, run_cost_sensitivity.py, run_robust_tep.py)
+- results/ (exported CSVs and figures)
 
 ### Key Features
 - **Time Series Integration**: Loads hourly load, wind, PV, and hydro data from CSV files
@@ -317,13 +305,13 @@ pip install -r requirements.txt
 ### Running Models
 ```bash
 # Run baseline DC OPF (static load)
-python src/run_baseline.py
+python src/scripts/run_baseline.py
 
 # Run single-period TEP
-python src/run_tep.py
+python src/scripts/run_tep.py
 
 # Run multi-period TEP with time series data (RECOMMENDED)
-python src/run_simplified_tep.py
+python src/scripts/run_simplified_tep.py
 ```
 
 **Recommended**: Use `run_simplified_tep.py` which:

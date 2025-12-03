@@ -4,7 +4,7 @@ DC Optimal Power Flow (OPF) baseline model
 from pyomo.environ import *
 import pandas as pd
 import numpy as np
-from data_loader import RTSDataLoader
+from .data_loader import RTSDataLoader
 
 class DCOPF:
     """DC Optimal Power Flow model"""

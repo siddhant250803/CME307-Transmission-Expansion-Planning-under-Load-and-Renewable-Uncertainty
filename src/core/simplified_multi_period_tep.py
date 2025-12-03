@@ -6,10 +6,10 @@ Stage 2: Solve TEP for critical periods only
 from pyomo.environ import *
 import pandas as pd
 import numpy as np
-from data_loader import RTSDataLoader
-from timeseries_loader import TimeseriesLoader
-from tep import TEP
-from dc_opf import DCOPF
+from .data_loader import RTSDataLoader
+from .timeseries_loader import TimeseriesLoader
+from .tep import TEP
+from .dc_opf import DCOPF
 
 class DCOPFWithLoads(DCOPF):
     """DC OPF that accepts custom loads"""
@@ -187,7 +187,7 @@ class SimplifiedMultiPeriodTEP:
         participation = self.timeseries.get_bus_load_participation_factors(buses)
         
         # Run DC OPF for multiple periods to find congestion
-        from dc_opf import DCOPF
+        from .dc_opf import DCOPF
         
         period_congestion = {}
         
@@ -264,7 +264,7 @@ class SimplifiedMultiPeriodTEP:
         
         # Create TEP with load shedding option - this will make expansion attractive
         # when load shedding cost > expansion cost
-        from tep_with_shedding import TEPWithLoadShedding
+        from .tep_with_shedding import TEPWithLoadShedding
         
         # Use targeted outages to create congestion
         branch_params = self.data.get_branch_parameters()

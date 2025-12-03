@@ -2,19 +2,22 @@
 Analyze infeasibility in periods 1-6 using IIS (Irreducible Infeasible Set) analysis
 and parametric analysis to find feasibility boundaries
 """
-import sys
 import os
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from src.data_loader import RTSDataLoader
-from src.timeseries_loader import TimeseriesLoader
-from src.dc_opf import DCOPF
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.core.data_loader import RTSDataLoader
+from src.core.timeseries_loader import TimeseriesLoader
+from src.core.dc_opf import DCOPF
 
 class DCOPFWithLoads(DCOPF):
     """DC OPF that accepts custom loads"""

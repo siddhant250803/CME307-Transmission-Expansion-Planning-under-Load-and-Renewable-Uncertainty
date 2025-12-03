@@ -4,9 +4,9 @@ Multi-period Transmission Expansion Planning model with time series data
 from pyomo.environ import *
 import pandas as pd
 import numpy as np
-from data_loader import RTSDataLoader
-from timeseries_loader import TimeseriesLoader
-from tep import TEP
+from .data_loader import RTSDataLoader
+from .timeseries_loader import TimeseriesLoader
+from .tep import TEP
 
 class MultiPeriodTEP(TEP):
     """Multi-period TEP model using time series data"""

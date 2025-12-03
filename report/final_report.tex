@@ -145,7 +145,7 @@ and \$1M/MW). Operating cost savings never offset the capital charges, so \textb
 \end{table}
 
 \section{Time-Series Integration and Multi-Period TEP}
-To honor the promised stochastic elements, we incorporated hourly load and renewable profiles:
+We incorporated hourly load and renewable profiles:
 \begin{enumerate}
     \item \textbf{Representative periods.} \texttt{TimeseriesLoader.select\_representative\_periods} offers
           peak/average/low and $k$-means selection. For tractability we start with the simpler peak/average/low split
@@ -161,7 +161,7 @@ To honor the promised stochastic elements, we incorporated hourly load and renew
 
 \section{Supply Shortage Stress Test}\label{sec:loadshed}
 How do we represent shortages? We created
-\texttt{src/run\_load\_shedding\_analysis.py}, which reuses the TEP formulation but disables candidate builds
+\texttt{src/scripts/run\_load\_shedding\_analysis.py}, which reuses the TEP formulation but disables candidate builds
 and adds non-negative \texttt{load\_shed} variables with a \$50k/MWh penalty. For each day-ahead period we derate all
 generators to 20\% of P\textsubscript{max} and scale nodal load by 40\%. The optimizer maxes out the remaining 2910~MW
 of generation and sheds the balance (Table~\ref{tab:loadshed}). The resulting shortage bill---\$88--110M per period---provides
@@ -190,7 +190,7 @@ To fulfill question (b) we introduced a scenario-based robust TEP model
 (\texttt{src/scenario\_robust\_tep.py}) in which the binary build decisions meet multiple stress cases
 simultaneously. Each scenario applies its own load factor, renewable availability, and branch derating pattern
 while sharing the investment vector. Table~\ref{tab:robust-scenarios} lists the scenarios used in
-\texttt{src/run\_robust\_tep.py}.
+\texttt{src/scripts/run\_robust\_tep.py}.
 
 \begin{table}[h]
     \centering

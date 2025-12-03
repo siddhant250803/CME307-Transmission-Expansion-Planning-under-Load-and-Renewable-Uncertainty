@@ -26,8 +26,8 @@ from pyomo.environ import (
 )
 from pyomo.opt import SolverFactory, TerminationCondition
 
-from data_loader import RTSDataLoader
-from tep import TEP
+from .data_loader import RTSDataLoader
+from .tep import TEP
 
 
 RENEWABLE_TYPES = {"WIND", "PV", "CSP", "HYDRO", "ROR"}

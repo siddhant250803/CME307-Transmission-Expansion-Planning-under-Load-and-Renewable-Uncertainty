@@ -2,14 +2,8 @@
 Example: Using different cost models for TEP
 Demonstrates how to use distance-based, capacity-based, and hybrid cost models
 """
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from src.data_loader import RTSDataLoader
-from src.tep import TEP
+from .data_loader import RTSDataLoader
+from .tep import TEP
 
 def compare_cost_models():
     """Compare different cost models"""

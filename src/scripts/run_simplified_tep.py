@@ -2,14 +2,15 @@
 Run Simplified Multi-Period TEP (works within Gurobi license limits)
 """
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data_loader import RTSDataLoader
-from src.timeseries_loader import TimeseriesLoader
-from src.simplified_multi_period_tep import SimplifiedMultiPeriodTEP
+from src.core.data_loader import RTSDataLoader
+from src.core.timeseries_loader import TimeseriesLoader
+from src.core.simplified_multi_period_tep import SimplifiedMultiPeriodTEP
 
 def main():
     print("="*60)

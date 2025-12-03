@@ -2,15 +2,16 @@
 Run Transmission Expansion Planning model
 """
 import sys
-import os
+from pathlib import Path
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Add project root to path for imports
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data_loader import RTSDataLoader
-from src.dc_opf import DCOPF
-from src.tep import TEP
+from src.core.data_loader import RTSDataLoader
+from src.core.dc_opf import DCOPF
+from src.core.tep import TEP
 
 def main():
     print("="*60)

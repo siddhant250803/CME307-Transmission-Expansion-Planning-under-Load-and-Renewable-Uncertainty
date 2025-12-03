@@ -4,7 +4,7 @@ Transmission Expansion Planning (TEP) MILP model
 from pyomo.environ import *
 import pandas as pd
 import numpy as np
-from data_loader import RTSDataLoader
+from .data_loader import RTSDataLoader
 
 class TEP:
     """Transmission Expansion Planning model"""
