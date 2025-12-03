@@ -26,6 +26,7 @@ def plot_network(data_loader, results=None, save_path=None):
             pos[bus_id] = (bus_id % 10, bus_id // 10)
     
     # Add edges
+    edgelist = []
     edge_colors = []
     edge_widths = []
     for _, branch in branches.iterrows():
@@ -33,6 +34,7 @@ def plot_network(data_loader, results=None, save_path=None):
         to_bus = int(branch['To Bus'])
         rating = branch['Cont Rating']
         
+        edgelist.append((from_bus, to_bus))
         G.add_edge(from_bus, to_bus, rating=rating)
         
         # Color by utilization if results available
@@ -55,7 +57,10 @@ def plot_network(data_loader, results=None, save_path=None):
     # Plot
     plt.figure(figsize=(16, 12))
     nx.draw_networkx_nodes(G, pos, node_size=100, node_color='lightblue', alpha=0.8)
-    nx.draw_networkx_edges(G, pos, edge_color=edge_colors, width=edge_widths, alpha=0.6)
+    # Pass an explicit edgelist so colors/widths align with the branch iteration order
+    nx.draw_networkx_edges(
+        G, pos, edgelist=edgelist, edge_color=edge_colors, width=edge_widths, alpha=0.6
+    )
     
     # Add labels for important buses
     important_buses = [bus_id for bus_id in buses.index if bus_id % 100 in [13, 18, 21, 22, 23]]

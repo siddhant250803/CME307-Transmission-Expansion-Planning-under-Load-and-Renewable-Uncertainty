@@ -43,20 +43,27 @@
 \maketitle
 
 \begin{abstract}
-    We investigated transmission expansion planning (TEP) on the IEEE RTS-GMLC system~\cite{national_renewable_energy_laboratory_reliability_nodate}
-    using a suite of DC optimal power flow (DC-OPF), single-period mixed-integer TEP, and time-series
-    driven multi-period models inspired by classical and robust planning literature~\cite{garver1970,conejo2006,ruiz2015}.
-    This report consolidates the empirical results (originally tracked in \texttt{RESULTS.md}) into a single
-    narrative, highlights the quantitative findings, and documents how shortages are modeled through a
-    load-shedding variant of the OPF.
+    We study transmission expansion planning (TEP) on the IEEE RTS-GMLC system~\cite{national_renewable_energy_laboratory_reliability_nodate} using a family of Pyomo models: a deterministic DC optimal power flow (DC-OPF), a single-period mixed-integer TEP, a time-series informed multi-period formulation, and a scenario-based robust variant. The through-line question is whether observed congestion or modeled uncertainty ever justifies building. We first confirm that the static grid redispatches around its three congested corridors without expanding, then check that cheaper capital costs and time-series stress still keep the ``do nothing'' decision. We price deliberate shortages via load shedding, and finally impose multiple simultaneous stress scenarios. Only that robust formulation triggers expansion, adding two 200~MW ties to stay feasible.
 \end{abstract}
+
+\section{Introduction}
+This project follows the goals laid out in our project proposal (\texttt{report/proposal.tex}): evaluate how transmission expansion decisions change when we move beyond a static DC-OPF benchmark to multi-period and robust formulations on the IEEE RTS-GMLC system. We draw on classic TEP literature for deterministic formulations~\cite{garver1970,conejo2006} and recent work on robustness under uncertainty~\cite{ruiz2015}. The central question is whether the congestion we see in the RTS-GMLC snapshot, or the uncertainty we model around it, is enough to justify building new lines.
+
+Our approach is staged so the goal stays visible as we increase model complexity:
+\begin{itemize}
+    \item Baseline DC-OPF and single-period TEP: if congestion alone were binding, the MILP would build.
+    \item Cost and time-series stress: cheaper capital and stressed representative hours test whether economics or timing flip the decision.
+    \item Scarcity pricing: a load-shedding variant converts shortages into dollars.
+    \item Robust TEP: one build plan must satisfy simultaneous stressors; this is the final hurdle that could force expansion.
+\end{itemize}
+Each step answers ``why build?'' under stronger assumptions; we only escalate when the simpler setting still declines to invest.
 
 \section{Data and Modeling Approach}
 We rely on the RTS-GMLC static network (73 buses, 120 AC branches, 158 generators) and its hourly
-time series for regional load, wind, photovoltaic (PV), and hydro production. The \texttt{src/data\_loader.py}
-and \texttt{src/timeseries\_loader.py} modules align the static and dynamic data. All operational models
+time series for regional load, wind, photovoltaic (PV), and hydro production. The \texttt{src/core/data\_loader.py}
+and \texttt{src/core/timeseries\_loader.py} modules align the static and dynamic data. All operational models
 use Pyomo to solve DC-OPF style problems with Gurobi (and GLPK as fallback when needed). Candidate
-transmission corridors are generated automatically by \texttt{src/tep.py}, and cost functions can be switched
+transmission corridors are generated automatically by \texttt{src/core/tep.py}, and cost functions can be switched
 between capacity-distance, pure distance, or capacity-only formulations to study capital expenditure assumptions.
 
 \section{Mathematical Formulation}
@@ -84,7 +91,7 @@ where $c_g$ is the marginal production cost, $F_\ell$ the capital charge for can
 $d_b$ the net load at bus $b$, $B_\ell$ the susceptance of line $\ell$, and $\bar f_\ell$
 its thermal limit. Equations~\eqref{eq:balance} enforce nodal power balance, \eqref{eq:dcflow} impose DC power flow,
 and \eqref{eq:candlimit} couple flows on candidate lines to their binary build decisions through a Big-M constraint.
-In the multi-period implementation (\texttt{src/multi\_period\_tep.py}) the variables $p_g$, $f_\ell$, and $\theta_b$
+In the multi-period implementation (\texttt{src/core/multi\_period\_tep.py}) the variables $p_g$, $f_\ell$, and $\theta_b$
 are indexed by representative time period while the investments $x_\ell$ remain static.
 
 To study infeasible periods or deliberate stress tests we add non-negative slack variables $s_b$
@@ -99,9 +106,16 @@ In the implementation $\gamma$ is the \texttt{shedding\_cost\_per\_mw} argument 
     as a penalty when quantifying shortages in Section~\ref{sec:loadshed}.
 
     \section{Baseline DC-OPF Benchmark}
-    The starting point is the static DC-OPF in \texttt{src/dc\_opf.py}. Table~\ref{tab:baseline} compares the baseline
+    The starting point is the static DC-OPF in \texttt{src/core/dc\_opf.py}. Table~\ref{tab:baseline} compares the baseline
     dispatch with the single-period TEP result (which collapses to the same dispatch because no new lines are built).
-    The grid satisfies $8550$~MW of load at a \$138.97k operations cost, with three heavily loaded lines.
+    The grid satisfies $8550$~MW of load at a \$138.97k operations cost, with three heavily loaded lines. This anchors the storyline: if a model that is allowed to build still chooses not to, later sections must uncover stronger drivers before expansion becomes rational.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{../results/network_baseline.png}
+    \caption{RTS-GMLC network under baseline dispatch. The three congested interties (A27, CA-1, CB-1) hit their thermal limits (red), while the remainder of the grid carries modest flows.}
+    \label{fig:network-baseline}
+\end{figure}
 
 \begin{table}[h]
     \centering
@@ -122,8 +136,8 @@ In the implementation $\gamma$ is the \texttt{shedding\_cost\_per\_mw} argument 
 \end{table}
 
 \section{Transmission Cost Modeling and Sensitivity}
-The TEP code supports three capital cost models. Table~\ref{tab:costmodels} summarizes their impact on a
-representative 500~MW, 100~mile, 230~kV line (implemented in \texttt{src/example\_cost\_models.py}).
+The next hypothesis is economic: perhaps the system would build if capital were cheaper. The TEP code supports three capital cost models. Table~\ref{tab:costmodels} summarizes their impact on a
+representative 500~MW, 100~mile, 230~kV line (implemented in \texttt{src/core/example\_cost\_models.py}).
 Even an aggressive \$200k/MW capacity-only assumption yields a \$100M line, while the realistic voltage-aware
 distance model produces \$150M. Because the static system already redispatches around congestion, none of the cost
 settings trigger investment in the single-period TEP or in the cost-sensitivity sweep (line costs between \$100k/MW
@@ -145,27 +159,29 @@ and \$1M/MW). Operating cost savings never offset the capital charges, so \textb
 \end{table}
 
 \section{Time-Series Integration and Multi-Period TEP}
-We incorporated hourly load and renewable profiles:
+Since cheaper capital still did not trigger expansion, we turned to time-varying stress: do representative hours with different renewable availability create a need for new lines? We incorporated hourly load and renewable profiles:
 \begin{enumerate}
     \item \textbf{Representative periods.} \texttt{TimeseriesLoader.select\_representative\_periods} offers
           peak/average/low and $k$-means selection. For tractability we start with the simpler peak/average/low split
           and explicitly inspect periods 1--12.
     \item \textbf{Feasibility diagnostics.} Periods 1--6 are infeasible under strict P\textsubscript{min} because total
           minimum generation (3775~MW) exceeds the load (3400--3700~MW). The scripts in
-          \texttt{src/analyze\_infeasibility.py} quantify the gap and suggest either relaxing minimum outputs or enabling load shedding.
-    \item \textbf{Simplified multi-period TEP.} We use the two-stage approach in \texttt{src/simplified\_multi\_period\_tep.py}:
+          \texttt{src/analysis/analyze\_infeasibility.py} quantify the gap and suggest either relaxing minimum outputs or enabling load shedding.
+    \item \textbf{Simplified multi-period TEP.} We use the two-stage approach in \texttt{src/core/simplified\_multi\_period\_tep.py}:
           run multiple DC-OPFs to identify congested peak periods (10--11), then solve a stress-tested TEP with a 150\%
           load multiplier, an added 500~MW industrial load at bus 122, and targeted line derates. Even under that extreme scenario
           the solver still prefers to redispatch (no new lines, zero load shedding, \$129k total cost).
 \end{enumerate}
 
 \section{Supply Shortage Stress Test}\label{sec:loadshed}
-How do we represent shortages? We created
+The early representative-period runs expose feasibility tension in low-load hours because of minimum generation limits. Rather than ignore shortage, we price it explicitly. We created
 \texttt{src/scripts/run\_load\_shedding\_analysis.py}, which reuses the TEP formulation but disables candidate builds
 and adds non-negative \texttt{load\_shed} variables with a \$50k/MWh penalty. For each day-ahead period we derate all
 generators to 20\% of P\textsubscript{max} and scale nodal load by 40\%. The optimizer maxes out the remaining 2910~MW
 of generation and sheds the balance (Table~\ref{tab:loadshed}). The resulting shortage bill---\$88--110M per period---provides
-an explicit benchmark against which any resilience investment can be evaluated.
+an explicit benchmark against which any resilience investment can be evaluated. Figure~\ref{fig:load-shed-plot} shows
+the same stress test visually: shed energy stays near 38--43\% across periods, and the \$50k/MWh penalty converts that
+shortfall into an \$88--\$110M range per stressed hour.
 
 \begin{table}[h]
     \centering
@@ -185,12 +201,32 @@ an explicit benchmark against which any resilience investment can be evaluated.
     \label{tab:loadshed}
 \end{table}
 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\linewidth]{../results/plots/plot_load_shedding.png}
+    \caption{Load-shedding stress test with 20\% generator availability and 40\% load bump. Bars show the fraction of demand shed; the line overlays the \$50k/MWh penalty, demonstrating an \$88--\$110M shortage bill per period.}
+    \label{fig:load-shed-plot}
+\end{figure}
+
 \section{Scenario-Based Robust Expansion}
-To fulfill question (b) we introduced a scenario-based robust TEP model
-(\texttt{src/scenario\_robust\_tep.py}) in which the binary build decisions meet multiple stress cases
+All deterministic and time-series variants so far choose not to build. To test whether uncertainty itself forces expansion, we introduced a scenario-based robust TEP model
+(\texttt{src/core/scenario\_robust\_tep.py}) in which the binary build decisions meet multiple stress cases
 simultaneously. Each scenario applies its own load factor, renewable availability, and branch derating pattern
 while sharing the investment vector. Table~\ref{tab:robust-scenarios} lists the scenarios used in
 \texttt{src/scripts/run\_robust\_tep.py}.
+
+\section{Script-by-Script Insights}
+The entry-point scripts mirror the staged storyline above, from deterministic baselines to stressed and robust formulations. Briefly:
+\begin{itemize}
+    \item \texttt{run\_baseline.py} solves a linear DC-OPF on the fixed grid to check feasibility and congestion. Result: all load served, three 500~MW interties at 100\% loading, no investment option enabled.
+    \item \texttt{run\_tep.py} upgrades to a single-period MILP with binary build variables (30 candidates, \$1M/MW). Result: the optimizer still prefers the baseline dispatch; no lines are built.
+    \item \texttt{run\_cost\_sensitivity.py} repeats that MILP while sweeping line cost \$100k--\$1M/MW. Result: operating cost is flat and zero lines are built at every price point; congestion relief never beats the capital charge.
+    \item \texttt{run\_simplified\_tep.py} is a two-stage “multi-period lite” flow: identify two peak periods from the time series, then solve a stressed TEP with a 150\% load multiplier, +500~MW at bus 122, targeted derates, and cheap lines (\$200k/MW). Result: still no new lines and no shedding—the grid redispatches.
+    \item \texttt{run\_multi\_period\_tep.py} builds the full multi-period MILP over four representative periods with up to \(\sim\)20 candidates. It is intended to enforce all periods simultaneously but can hit Gurobi Web License Service (WLS) size limits (caps on rows/cols/nonzeros in some academic tiers). The simplified script above is the fallback when WLS rejects the larger model.
+    \item \texttt{run\_load\_shedding\_analysis.py} disables building and adds load-shed slacks with a \$50k/MWh penalty, while derating generators to 20\% of nameplate and scaling load by 40\%. Result: 37--43\% of demand is shed (penalty \$88--\$110M per period), giving a price tag for scarcity.
+    \item \texttt{run\_robust\_tep.py} enforces one build plan across three scenarios (nominal; high-load/low-renewable with intertie derates on A27/CA-1/CB-1; low-load/high-renewable), with softened line cost \$120k/MW. Result: two 200~MW links (101–106, 101–117) are built to keep every scenario feasible; scenario metrics are saved to \texttt{results/robust\_tep\_summary.csv}.
+\end{itemize}
+WLS size constraint: Gurobi’s Web License Service for academics can reject models once rows/columns/nonzeros exceed the allowance set by the license (often on the order of a few to tens of thousands matrix coefficients). The multi-period MILP grows with \#periods \(\times\) (\#buses + \#generators + \#branches + \#candidates); reducing periods or candidates, or using the simplified two-stage script, keeps the model inside those limits.
 
 \begin{table}[h]
     \centering
@@ -228,18 +264,14 @@ change both the investment plan and the expected operating cost.
     \label{tab:robust-results}
 \end{table}
 
-\section{Key Findings}
-\begin{itemize}
-    \item \textbf{Redundancy.} The RTS-GMLC grid absorbs over 150\% of peak load plus a new industrial site
-          without new transmission. Investment becomes attractive only under much cheaper line costs or significantly
-          higher load growth.
-    \item \textbf{Model fidelity.} The time-series integration pipeline (load participation, renewable availability limits,
-          representative period selection) is in place, enabling more advanced stochastic or robust TEP formulations.
-    \item \textbf{Shortage economics.} The load-shedding variant quantifies the dollar value of unmet demand,  providing a lever to compare future hardening options.
-    \item \textbf{Robust planning impact.} When we require the plan to survive the explicit uncertainty set of
-          Table~\ref{tab:robust-scenarios}, the solver invests \$61M in two new ties---a behavior absent from the deterministic
-          runs---showing that the robustness model meaningfully alters the recommended build-out.
-\end{itemize}
+\section{Conclusions}
+Across the deterministic and time-series experiments, the RTS-GMLC system behaves as a resilient grid: even with 150\% load multipliers, added industrial demand, and derated interfaces, the models prefer redispatch to new construction. This aligns with the original proposal objectives by showing that congestion alone does not justify expansion under current load and renewable profiles.
+
+The scarcity analysis assigns a clear price to unmet demand—\$88--110M per stressed period—giving a concrete benchmark for any resilience or hardening investment. Methodologically, the time-series pipeline (load participation factors, renewable availability bounds, representative periods) worked as intended and remains ready for richer stochastic or seasonal studies.
+
+The only setting that triggers transmission investment is the scenario-based robust formulation: under simultaneous load growth, renewable drought, and branch derates, the MILP builds two 200~MW ties at \$61.3M to maintain feasibility. This result underscores the value of modeling uncertainty explicitly, rather than relying solely on single-scenario analyses.
+
+Future work, consistent with the proposal, is to relax the Gurobi WLS size constraint (or cluster more periods) to run the full multi-period MILP, extend the scenario set to include N-1 security, and explore alternative cost models calibrated with additional empirical data.
 
 \printbibliography
 \end{document}
