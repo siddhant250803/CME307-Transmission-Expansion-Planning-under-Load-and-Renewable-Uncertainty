@@ -1,0 +1,4 @@
+scenario,description,total_load_mw,total_generation_mw,operating_cost
+base,Nominal demand and renewable availability,8550.00,8550.00,138925.58
+high_load_low_renew,Stressed load growth with renewable drought,10260.00,10260.00,225753.27
+low_load_high_renew,Mild demand with surplus renewables,7695.00,7695.00,129078.68

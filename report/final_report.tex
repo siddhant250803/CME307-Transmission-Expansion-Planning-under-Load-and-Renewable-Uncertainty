@@ -1,0 +1,245 @@
+\documentclass[10pt]{article}
+
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+    citecolor=black
+}
+
+\geometry{margin=0.8in}
+\setlength{\parskip}{0.4em}
+
+\sisetup{
+    round-mode=places,
+    round-precision=1,
+    group-separator=
+}
+
+% ============================
+% Biblatex configuration
+% ============================
+\usepackage[
+    backend=biber,   % recommended with biblatex
+    style=numeric,   % or authoryear, etc.
+    sorting=none
+]{biblatex}
+
+\addbibresource{bibliography.bib}
+
+\title{Transmission Expansion Planning under Load and Renewable Uncertainty}
+\author{Edouard Rabasse \and Siddhant Sukhani}
+\date{December 2025}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+    We investigated transmission expansion planning (TEP) on the IEEE RTS-GMLC system~\cite{national_renewable_energy_laboratory_reliability_nodate}
+    using a suite of DC optimal power flow (DC-OPF), single-period mixed-integer TEP, and time-series
+    driven multi-period models inspired by classical and robust planning literature~\cite{garver1970,conejo2006,ruiz2015}.
+    This report consolidates the empirical results (originally tracked in \texttt{RESULTS.md}) into a single
+    narrative, highlights the quantitative findings, and documents how shortages are modeled through a
+    load-shedding variant of the OPF.
+\end{abstract}
+
+\section{Data and Modeling Approach}
+We rely on the RTS-GMLC static network (73 buses, 120 AC branches, 158 generators) and its hourly
+time series for regional load, wind, photovoltaic (PV), and hydro production. The \texttt{src/data\_loader.py}
+and \texttt{src/timeseries\_loader.py} modules align the static and dynamic data. All operational models
+use Pyomo to solve DC-OPF style problems with Gurobi (and GLPK as fallback when needed). Candidate
+transmission corridors are generated automatically by \texttt{src/tep.py}, and cost functions can be switched
+between capacity-distance, pure distance, or capacity-only formulations to study capital expenditure assumptions.
+
+\section{Mathematical Formulation}
+Let $\mathcal{B}$ be the set of buses, $\mathcal{G}$ the set of generators, $\mathcal{L}$ the existing
+ac lines, and $\mathcal{C}$ the candidate corridors. The binary variable $x_\ell$ indicates whether
+candidate $\ell \in \mathcal{C}$ is built, $p_g$ is the generation of unit $g$, $\theta_b$ is the phase
+angle at bus $b$, and $f_\ell$ the power flow on line or candidate $\ell$. The single-period TEP model
+solves
+\begin{align}
+    \min \quad & \sum_{g \in \mathcal{G}} c_g p_g + \sum_{\ell \in \mathcal{C}} F_\ell x_\ell \label{eq:obj}                                                                                                                  \\
+    \text{s.t.} \quad
+               & \sum_{g \in \mathcal{G}_b} p_g
+    + \sum_{\ell \in \mathcal{L}_b^{\text{in}}} f_\ell
+    - \sum_{\ell \in \mathcal{L}_b^{\text{out}}} f_\ell
+    + \sum_{\ell \in \mathcal{C}_b^{\text{in}}} f_\ell
+    - \sum_{\ell \in \mathcal{C}_b^{\text{out}}} f_\ell
+    = d_b      &                                                                                             & \forall b \in \mathcal{B} \label{eq:balance}                                                                   \\
+               & f_\ell = B_\ell (\theta_{i(\ell)} - \theta_{j(\ell)})                                       &                                              & \forall \ell \in \mathcal{L} \cup \mathcal{C} \label{eq:dcflow} \\
+               & -\bar f_\ell \le f_\ell \le \bar f_\ell                                                     &                                              & \forall \ell \in \mathcal{L} \label{eq:existinglimit}           \\
+               & -\bar f_\ell x_\ell \le f_\ell \le \bar f_\ell x_\ell                                       &                                              & \forall \ell \in \mathcal{C} \label{eq:candlimit}               \\
+               & \underline{p}_g \le p_g \le \bar{p}_g                                                       &                                              & \forall g \in \mathcal{G} \label{eq:genbounds}                  \\
+               & \theta_{b_0} = 0                                                                            &                                              & \text{(reference bus)} \label{eq:ref}
+\end{align}
+where $c_g$ is the marginal production cost, $F_\ell$ the capital charge for candidate $\ell$,
+$d_b$ the net load at bus $b$, $B_\ell$ the susceptance of line $\ell$, and $\bar f_\ell$
+its thermal limit. Equations~\eqref{eq:balance} enforce nodal power balance, \eqref{eq:dcflow} impose DC power flow,
+and \eqref{eq:candlimit} couple flows on candidate lines to their binary build decisions through a Big-M constraint.
+In the multi-period implementation (\texttt{src/multi\_period\_tep.py}) the variables $p_g$, $f_\ell$, and $\theta_b$
+are indexed by representative time period while the investments $x_\ell$ remain static.
+
+To study infeasible periods or deliberate stress tests we add non-negative slack variables $s_b$
+representing curtailed demand with penalty $\gamma$:
+\begin{align}
+    \min \quad & \sum_{g} c_g p_g + \gamma \sum_{b} s_b                                     \\
+    \text{s.t.} \quad
+               & \eqref{eq:balance} \text{ with } d_b \leftarrow d_b - s_b,\quad s_b \ge 0.
+\end{align}
+In the implementation $\gamma$ is the \texttt{shedding\_cost\_per\_mw} argument supplied to
+\texttt{TEPWithLoadShedding}; we set $\gamma=\$50{,}000$/MWh in \texttt{run\_load\_shedding\_analysis.py}
+    as a penalty when quantifying shortages in Section~\ref{sec:loadshed}.
+
+    \section{Baseline DC-OPF Benchmark}
+    The starting point is the static DC-OPF in \texttt{src/dc\_opf.py}. Table~\ref{tab:baseline} compares the baseline
+    dispatch with the single-period TEP result (which collapses to the same dispatch because no new lines are built).
+    The grid satisfies $8550$~MW of load at a \$138.97k operations cost, with three heavily loaded lines.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lll}
+        \toprule
+        Metric                & {Baseline DC-OPF} & {Single-Period TEP} \\
+        \midrule
+        Operating cost [\$]   & 138,967           & 138,967             \\
+        Total generation [MW] & 8,550             & 8,550               \\
+        Total load [MW]       & 8,550             & 8,550               \\
+        Investment cost [\$]  & 0                 & 0                   \\
+        Congested branches    & 3                 & 3 (A27, CA-1, CB-1) \\
+        Lines built           & 0                 & 0                   \\
+        \bottomrule
+    \end{tabular}
+    \caption{Baseline performance metrics (data reproduced from \texttt{RESULTS.md}).}
+    \label{tab:baseline}
+\end{table}
+
+\section{Transmission Cost Modeling and Sensitivity}
+The TEP code supports three capital cost models. Table~\ref{tab:costmodels} summarizes their impact on a
+representative 500~MW, 100~mile, 230~kV line (implemented in \texttt{src/example\_cost\_models.py}).
+Even an aggressive \$200k/MW capacity-only assumption yields a \$100M line, while the realistic voltage-aware
+distance model produces \$150M. Because the static system already redispatches around congestion, none of the cost
+settings trigger investment in the single-period TEP or in the cost-sensitivity sweep (line costs between \$100k/MW
+and \$1M/MW). Operating cost savings never offset the capital charges, so \textbf{no expansion was built in any scenario}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lll}
+        \toprule
+        Model                      & Formula                                              & Cost [\$] \\
+        \midrule
+        Capacity-distance          & \$1M/MW $\times$ 500 MW $\times$ (160.9 km / 100 km) & 804.7M    \\
+        Distance-based (preferred) & \$1.5M/mile $\times$ 100 miles (230 kV)              & 150.0M    \\
+        Capacity-only              & \$200k/MW $\times$ 500 MW                            & 100.0M    \\
+        \bottomrule
+    \end{tabular}
+    \caption{Capital cost comparison for a single candidate line.}
+    \label{tab:costmodels}
+\end{table}
+
+\section{Time-Series Integration and Multi-Period TEP}
+To honor the promised stochastic elements, we incorporated hourly load and renewable profiles:
+\begin{enumerate}
+    \item \textbf{Representative periods.} \texttt{TimeseriesLoader.select\_representative\_periods} offers
+          peak/average/low and $k$-means selection. For tractability we start with the simpler peak/average/low split
+          and explicitly inspect periods 1--12.
+    \item \textbf{Feasibility diagnostics.} Periods 1--6 are infeasible under strict P\textsubscript{min} because total
+          minimum generation (3775~MW) exceeds the load (3400--3700~MW). The scripts in
+          \texttt{src/analyze\_infeasibility.py} quantify the gap and suggest either relaxing minimum outputs or enabling load shedding.
+    \item \textbf{Simplified multi-period TEP.} We use the two-stage approach in \texttt{src/simplified\_multi\_period\_tep.py}:
+          run multiple DC-OPFs to identify congested peak periods (10--11), then solve a stress-tested TEP with a 150\%
+          load multiplier, an added 500~MW industrial load at bus 122, and targeted line derates. Even under that extreme scenario
+          the solver still prefers to redispatch (no new lines, zero load shedding, \$129k total cost).
+\end{enumerate}
+
+\section{Supply Shortage Stress Test}\label{sec:loadshed}
+How do we represent shortages? We created
+\texttt{src/run\_load\_shedding\_analysis.py}, which reuses the TEP formulation but disables candidate builds
+and adds non-negative \texttt{load\_shed} variables with a \$50k/MWh penalty. For each day-ahead period we derate all
+generators to 20\% of P\textsubscript{max} and scale nodal load by 40\%. The optimizer maxes out the remaining 2910~MW
+of generation and sheds the balance (Table~\ref{tab:loadshed}). The resulting shortage bill---\$88--110M per period---provides
+an explicit benchmark against which any resilience investment can be evaluated.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{cccccc}
+        \toprule
+        Period & Load [MW] & Generation [MW] & Load Shed [MW] & Load Shed [\%] & Penalty [\$M] \\
+        \midrule
+        1      & 4,765     & 2,910           & 1,855          & 38.9\%         & 92.8          \\
+        2      & 4,669     & 2,910           & 1,759          & 37.7\%         & 88.0          \\
+        3      & 4,643     & 2,910           & 1,733          & 37.3\%         & 86.7          \\
+        4      & 4,659     & 2,910           & 1,749          & 37.5\%         & 87.4          \\
+        5      & 4,830     & 2,910           & 1,920          & 39.8\%         & 96.0          \\
+        6      & 5,108     & 2,910           & 2,198          & 43.0\%         & 109.9         \\
+        \bottomrule
+    \end{tabular}
+    \caption{Load-shedding outcomes saved to \texttt{results/load\_shedding\_periods.csv}.}
+    \label{tab:loadshed}
+\end{table}
+
+\section{Scenario-Based Robust Expansion}
+To fulfill question (b) we introduced a scenario-based robust TEP model
+(\texttt{src/scenario\_robust\_tep.py}) in which the binary build decisions meet multiple stress cases
+simultaneously. Each scenario applies its own load factor, renewable availability, and branch derating pattern
+while sharing the investment vector. Table~\ref{tab:robust-scenarios} lists the scenarios used in
+\texttt{src/run\_robust\_tep.py}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lllll}
+        \toprule
+        Scenario               & Load scale & Renewable scale & Branch stress                       & Weight \\
+        \midrule
+        base                   & 1.00       & 1.00            & Nominal                             & 0.40   \\
+        high\_load\_low\_renew & 1.20       & 0.70            & 0.85 overall, 0.40 on A27/CA-1/CB-1 & 0.35   \\
+        low\_load\_high\_renew & 0.90       & 1.15            & 1.05 overall                        & 0.25   \\
+        \bottomrule
+    \end{tabular}
+    \caption{Scenario definitions for the robust TEP experiment. Branch stress values scale the thermal limits.}
+    \label{tab:robust-scenarios}
+\end{table}
+
+Solving the MILP with a reduced candidate cost of \$120k/MW yields the per-scenario operating profiles in
+Table~\ref{tab:robust-results}. To remain feasible under the derated interties, the model proactively builds two
+200~MW links (Bus 101 $\rightarrow$ 106 and Bus 101 $\rightarrow$ 117) at a combined \$61.3M capital charge, whereas the
+single-scenario studies built nothing. This demonstrates that incorporating an explicit uncertainty set can materially
+change both the investment plan and the expected operating cost.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lccc}
+        \toprule
+        Scenario               & Total load [MW] & Total generation [MW] & Operating cost [\$] \\
+        \midrule
+        base                   & 8{,}550         & 8{,}550               & 138{,}925.58        \\
+        high\_load\_low\_renew & 10{,}260        & 10{,}260              & 225{,}753.27        \\
+        low\_load\_high\_renew & 7{,}695         & 7{,}695               & 129{,}078.68        \\
+        \bottomrule
+    \end{tabular}
+    \caption{Scenario-level operating results for the robust TEP run (\texttt{results/robust\_tep\_summary.csv}).}
+    \label{tab:robust-results}
+\end{table}
+
+\section{Key Findings}
+\begin{itemize}
+    \item \textbf{Redundancy.} The RTS-GMLC grid absorbs over 150\% of peak load plus a new industrial site
+          without new transmission. Investment becomes attractive only under much cheaper line costs or significantly
+          higher load growth.
+    \item \textbf{Model fidelity.} The time-series integration pipeline (load participation, renewable availability limits,
+          representative period selection) is in place, enabling more advanced stochastic or robust TEP formulations.
+    \item \textbf{Shortage economics.} The load-shedding variant quantifies the dollar value of unmet demand,  providing a lever to compare future hardening options.
+    \item \textbf{Robust planning impact.} When we require the plan to survive the explicit uncertainty set of
+          Table~\ref{tab:robust-scenarios}, the solver invests \$61M in two new ties---a behavior absent from the deterministic
+          runs---showing that the robustness model meaningfully alters the recommended build-out.
+\end{itemize}
+
+\printbibliography
+\end{document}

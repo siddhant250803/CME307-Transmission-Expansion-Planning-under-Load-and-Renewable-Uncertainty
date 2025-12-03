@@ -1,0 +1,153 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global/global}
+    \entry{national_renewable_energy_laboratory_reliability_nodate}{misc}{}{}
+      \name{author}{1}{}{%
+        {{hash=b008d1abdbee465a017da6e11d139e72}{%
+           family={Laboratory},
+           familyi={L\bibinitperiod},
+           given={National\bibnamedelimb Renewable\bibnamedelima Energy},
+           giveni={N\bibinitperiod\bibinitdelim R\bibinitperiod\bibinitdelim E\bibinitperiod}}}%
+      }
+      \strng{namehash}{b008d1abdbee465a017da6e11d139e72}
+      \strng{fullhash}{b008d1abdbee465a017da6e11d139e72}
+      \strng{fullhashraw}{b008d1abdbee465a017da6e11d139e72}
+      \strng{bibnamehash}{b008d1abdbee465a017da6e11d139e72}
+      \strng{authorbibnamehash}{b008d1abdbee465a017da6e11d139e72}
+      \strng{authornamehash}{b008d1abdbee465a017da6e11d139e72}
+      \strng{authorfullhash}{b008d1abdbee465a017da6e11d139e72}
+      \strng{authorfullhashraw}{b008d1abdbee465a017da6e11d139e72}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{Dataset:Reliability {Test} {System} - {Grid} {Modernization} {Lab} {Consortium}}
+      \verb{urlraw}
+      \verb https://github.com/GridMod/RTS-GMLC
+      \endverb
+      \verb{url}
+      \verb https://github.com/GridMod/RTS-GMLC
+      \endverb
+    \endentry
+    \entry{garver1970}{article}{}{}
+      \name{author}{1}{}{%
+        {{hash=99c064926b66127834e2ec57fc78a893}{%
+           family={Garver},
+           familyi={G\bibinitperiod},
+           given={L.\bibnamedelimi L.},
+           giveni={L\bibinitperiod\bibinitdelim L\bibinitperiod}}}%
+      }
+      \strng{namehash}{99c064926b66127834e2ec57fc78a893}
+      \strng{fullhash}{99c064926b66127834e2ec57fc78a893}
+      \strng{fullhashraw}{99c064926b66127834e2ec57fc78a893}
+      \strng{bibnamehash}{99c064926b66127834e2ec57fc78a893}
+      \strng{authorbibnamehash}{99c064926b66127834e2ec57fc78a893}
+      \strng{authornamehash}{99c064926b66127834e2ec57fc78a893}
+      \strng{authorfullhash}{99c064926b66127834e2ec57fc78a893}
+      \strng{authorfullhashraw}{99c064926b66127834e2ec57fc78a893}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{IEEE Transactions on Power Apparatus and Systems}
+      \field{number}{7}
+      \field{title}{Transmission network estimation using linear programming}
+      \field{volume}{PAS-89}
+      \field{year}{1970}
+      \field{pages}{1688\bibrangedash 1697}
+      \range{pages}{10}
+    \endentry
+    \entry{conejo2006}{article}{}{}
+      \name{author}{4}{}{%
+        {{hash=aba88c01ff0b7da344a4e8188170b122}{%
+           family={Conejo},
+           familyi={C\bibinitperiod},
+           given={Antonio\bibnamedelima J.},
+           giveni={A\bibinitperiod\bibinitdelim J\bibinitperiod}}}%
+        {{hash=03215baeaec0c3a13716ac340afa539d}{%
+           family={Castillo},
+           familyi={C\bibinitperiod},
+           given={Enrique},
+           giveni={E\bibinitperiod}}}%
+        {{hash=07e11b5f9e38d3c9e79e1dc5afe9cbf2}{%
+           family={Minguez},
+           familyi={M\bibinitperiod},
+           given={Roberto},
+           giveni={R\bibinitperiod}}}%
+        {{hash=1e00a76d404e491df901c23fcc07a577}{%
+           family={García-Bertrand},
+           familyi={G\bibinithyphendelim B\bibinitperiod},
+           given={Raquel},
+           giveni={R\bibinitperiod}}}%
+      }
+      \strng{namehash}{ccde8d166557ea5e2dd3592f58d3dede}
+      \strng{fullhash}{fdad1af6c88d002257af83f0f1c271ce}
+      \strng{fullhashraw}{fdad1af6c88d002257af83f0f1c271ce}
+      \strng{bibnamehash}{ccde8d166557ea5e2dd3592f58d3dede}
+      \strng{authorbibnamehash}{ccde8d166557ea5e2dd3592f58d3dede}
+      \strng{authornamehash}{ccde8d166557ea5e2dd3592f58d3dede}
+      \strng{authorfullhash}{fdad1af6c88d002257af83f0f1c271ce}
+      \strng{authorfullhashraw}{fdad1af6c88d002257af83f0f1c271ce}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{Springer}
+      \field{title}{Decomposition techniques in mathematical programming}
+      \field{year}{2006}
+    \endentry
+    \entry{ruiz2015}{article}{}{}
+      \name{author}{2}{}{%
+        {{hash=620a78ea9b4db14ff01a5a601a35eee3}{%
+           family={Ruiz},
+           familyi={R\bibinitperiod},
+           given={Carlos},
+           giveni={C\bibinitperiod}}}%
+        {{hash=aba88c01ff0b7da344a4e8188170b122}{%
+           family={Conejo},
+           familyi={C\bibinitperiod},
+           given={Antonio\bibnamedelima J.},
+           giveni={A\bibinitperiod\bibinitdelim J\bibinitperiod}}}%
+      }
+      \strng{namehash}{23d413d262e70d5d0097296515810dff}
+      \strng{fullhash}{23d413d262e70d5d0097296515810dff}
+      \strng{fullhashraw}{23d413d262e70d5d0097296515810dff}
+      \strng{bibnamehash}{23d413d262e70d5d0097296515810dff}
+      \strng{authorbibnamehash}{23d413d262e70d5d0097296515810dff}
+      \strng{authornamehash}{23d413d262e70d5d0097296515810dff}
+      \strng{authorfullhash}{23d413d262e70d5d0097296515810dff}
+      \strng{authorfullhashraw}{23d413d262e70d5d0097296515810dff}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{journaltitle}{European Journal of Operational Research}
+      \field{number}{2}
+      \field{title}{Robust transmission expansion planning}
+      \field{volume}{242}
+      \field{year}{2015}
+      \field{pages}{390\bibrangedash 401}
+      \range{pages}{12}
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+

@@ -114,12 +114,66 @@ This project implements Transmission Expansion Planning (TEP) using the IEEE RTS
   - Solution time: <0.01 seconds (optimal solution found immediately)
   - Presolve: Removed 640 rows and 231 columns (80% reduction)
 - **Results**:
-  - **Total System Cost**: $129,078.68
-  - **Investment Cost**: $0.00
-  - **Operating Cost**: $129,078.68
-  - **Load Shedding**: 0 MW (system can meet all demand even under extreme stress)
-  - **Lines Built**: 0
-  - **Key Finding**: Even with 150% load stress + 500 MW new load, no expansion needed
+- **Total System Cost**: $129,078.68
+- **Investment Cost**: $0.00
+- **Operating Cost**: $129,078.68
+- **Load Shedding**: 0 MW (system can meet all demand even under extreme stress)
+- **Lines Built**: 0
+- **Key Finding**: Even with 150% load stress + 500 MW new load, no expansion needed
+
+### Supply Shortage Stress Test (Load Shedding Model)
+
+Reviewer question (a) asked how we handle periods where load exceeds available supply.  
+We implemented a DC-OPF variant with explicit load shedding using `TEPWithLoadShedding`
+and created the runnable script `src/run_load_shedding_analysis.py`.  
+Each run temporarily (i) derates every generator to 20% of its nameplate capacity, (ii) scales nodal loads by 40%,
+and (iii) enforces a \$50k/MWh penalty on unserved energy. This combination creates an acute shortage
+that forces the model to use the `load_shed` slack variables. The script prints the period-by-period summary
+and writes the results to `results/load_shedding_periods.csv`.
+
+| Period | Total Load (MW) | Generation (MW) | Load Shed (MW) | Load Shed (%) | Load Shed Cost (\$M) |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 4765.4 | 2910.0 | 1855.5 | 38.9% | 92.77 |
+| 2 | 4669.1 | 2910.0 | 1759.1 | 37.7% | 87.96 |
+| 3 | 4642.9 | 2910.0 | 1732.9 | 37.3% | 86.65 |
+| 4 | 4658.6 | 2910.0 | 1748.7 | 37.5% | 87.43 |
+| 5 | 4830.0 | 2910.0 | 1920.0 | 39.8% | 96.00 |
+ | 6 | 5108.1 | 2910.0 | 2198.2 | 43.0% | 109.91 |
+
+Interpretation:
+- The solution keeps every remaining generator at the new 2910 MW ceiling and sheds the balance of load,
+demonstrating that shortages are captured as explicit decision variables in the optimization problem.
+- The \$50k/MWh penalty translates the shortage into economic terms, which can be contrasted with
+candidate line investments or alternative mitigation actions.
+- Because the shortage data are exported to CSV, we can easily plug the numbers into the final report
+and discuss how different penalty levels or derating assumptions affect the amount of unserved load.
+
+### Scenario-Based Robust TEP
+
+To answer reviewer question (b) about robustness, we prototyped a scenario-based formulation
+(`src/scenario_robust_tep.py`) and a driver script `src/run_robust_tep.py`. We defined three scenarios:
+
+| Scenario | Load scale | Renewable scale | Branch stress | Weight | Description |
+| --- | --- | --- | --- | --- | --- |
+| base | 1.00 | 1.00 | 1.00 on all lines | 0.40 | Nominal demand and availability |
+| high\_load\_low\_renew | 1.20 | 0.70 | 0.85 on all lines, 0.40 on A27/CA-1/CB-1 | 0.35 | Load surge with renewable drought and corridor outages |
+| low\_load\_high\_renew | 0.90 | 1.15 | 1.05 on all lines | 0.25 | Mild demand with surplus renewables |
+
+Each scenario shares the same binary build variables, so the MILP selects one investment plan that satisfies
+all three simultaneously. We lowered the candidate line cost to \$120k/MW to reflect the more urgent
+reinforcement need under the stressed case. Results (saved in `results/robust_tep_summary.csv`) are:
+
+| Scenario | Total load (MW) | Total generation (MW) | Operating cost (\$) |
+| --- | --- | --- | --- |
+| base | 8,550 | 8,550 | 138,925.58 |
+| high\_load\_low\_renew | 10,260 | 10,260 | 225,753.27 |
+| low\_load\_high\_renew | 7,695 | 7,695 | 129,078.68 |
+
+The robust solve built two lines (Bus 101 → 106 and Bus 101 → 117, both 200 MW) at a combined
+\$61.3 M investment. Those reinforcements relieve the derated interties in the high-load scenario and
+ensure feasibility without resorting to load shedding. The weighted objective is \$61.46 M, dominated by
+the capital expenditures—highlighting how the robustness requirement drives proactive expansion, unlike the
+single-scenario runs where no new lines were needed.
 
 ### Key Findings
 

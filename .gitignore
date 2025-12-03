@@ -1,2 +1,4 @@
 gurobi.lic
 *__pycache__/
+.aux/
+out/
