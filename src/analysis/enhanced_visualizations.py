@@ -959,9 +959,10 @@ def create_summary_dashboard(results_dir: Path, data_loader,
     ax_network.set_title('Network Topology (3 Regions)', fontsize=18, fontweight='bold')
     ax_network.axis('off')
     
-    # 3. Generation Mix (middle left)
+    # 3. Generation Mix (middle left) - TREEMAP
     ax_gen = fig.add_subplot(gs[1, 0])
     if 'generation' in baseline_results:
+        import squarify
         generators = data_loader.get_generator_data()
         gen_by_type = {}
         for gen_id, power in baseline_results['generation'].items():
@@ -972,14 +973,24 @@ def create_summary_dashboard(results_dir: Path, data_loader,
                     gen_by_type[gen_type] = gen_by_type.get(gen_type, 0) + power
         
         if gen_by_type:
-            types = list(gen_by_type.keys())
-            powers = [gen_by_type[t] for t in types]
-            colors = [GEN_COLORS.get(t, '#95A5A6') for t in types]
-            wedges, texts, autotexts = ax_gen.pie(powers, labels=types, colors=colors, 
-                                                   autopct='%1.0f%%',
-                                                   textprops={'fontsize': 11, 'fontweight': 'bold'})
-            for autotext in autotexts:
-                autotext.set_fontweight('bold')
+            total = sum(gen_by_type.values())
+            # Separate large (>=5%) and small (<5%) categories
+            large_types = {t: p for t, p in gen_by_type.items() if p/total >= 0.05}
+            small_types = {t: p for t, p in gen_by_type.items() if p/total < 0.05}
+            
+            # Combine small types into "Others"
+            if small_types:
+                large_types['Others'] = sum(small_types.values())
+            
+            sorted_items = sorted(large_types.items(), key=lambda x: x[1], reverse=True)
+            types = [item[0] for item in sorted_items]
+            powers = [item[1] for item in sorted_items]
+            colors = [GEN_COLORS.get(t, '#7F8C8D') for t in types]
+            labels = [f"{t}\n{p/total*100:.0f}%" for t, p in zip(types, powers)]
+            
+            squarify.plot(sizes=powers, label=labels, color=colors, alpha=0.85,
+                         ax=ax_gen, text_kwargs={'fontsize': 9, 'fontweight': 'bold'})
+            ax_gen.axis('off')
     ax_gen.set_title('Generation Mix', fontsize=18, fontweight='bold')
     
     # 4. Congestion (middle center)

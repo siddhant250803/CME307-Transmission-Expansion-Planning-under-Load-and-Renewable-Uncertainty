@@ -107,7 +107,7 @@ class RTSDataLoader:
                 'susceptance': 1.0 / x_value if x_value > 0 else 0.0
             }
         return branch_params
-    
+
     def get_system_summary(self) -> Dict[str, Any]:
         """Get a summary of the power system."""
         return {
