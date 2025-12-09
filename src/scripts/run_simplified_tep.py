@@ -1,5 +1,30 @@
 """
-Run Simplified Multi-Period TEP (works within Gurobi license limits)
+Simplified Multi-Period Transmission Expansion Planning
+=======================================================
+
+This script implements a two-stage approach to multi-period TEP that avoids
+the computational complexity of a full multi-period MILP:
+
+Stage 1: Identify peak congestion periods
+    - Run DC-OPF across multiple time periods
+    - Identify periods with highest load and congestion
+    
+Stage 2: Solve aggregated TEP
+    - Solve TEP for peak load scenario (with stress multipliers)
+    - Uses simplified representation to stay within Gurobi license limits
+
+This approach is more tractable than full multi-period TEP while still
+capturing time-varying load and renewable patterns.
+
+Output:
+- Prints peak period identification results
+- Prints TEP solution summary
+
+Usage:
+    python src/scripts/run_simplified_tep.py
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 import sys
 from pathlib import Path
@@ -13,6 +38,13 @@ from src.core.timeseries_loader import TimeseriesLoader
 from src.core.simplified_multi_period_tep import SimplifiedMultiPeriodTEP
 
 def main():
+    """
+    Main execution function.
+    
+    Runs two-stage multi-period TEP analysis:
+    1. Identifies peak congestion periods from time series
+    2. Solves TEP for aggregated peak load scenario
+    """
     print("="*60)
     print("CME307: Simplified Multi-Period TEP")
     print("Using Time Series Data (Peak Period Analysis)")

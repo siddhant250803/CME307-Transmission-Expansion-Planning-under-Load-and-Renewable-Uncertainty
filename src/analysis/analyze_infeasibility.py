@@ -57,7 +57,7 @@ def analyze_iis(period, data_loader, timeseries_loader, results_dir):
     dcopf = DCOPFWithLoads(data_loader, nodal_loads)
     dcopf.build_model()
     
-    # Try to solve - should fail
+    # Try to solve - this should fail
     opt = SolverFactory('gurobi')
     opt.options['IISMethod'] = 1  # Enable IIS computation
     opt.options['LogFile'] = os.path.join(results_dir, f'iis_period_{period}.log')

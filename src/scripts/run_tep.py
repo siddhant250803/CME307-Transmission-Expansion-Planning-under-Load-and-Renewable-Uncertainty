@@ -1,5 +1,24 @@
 """
-Run Transmission Expansion Planning model
+Run Transmission Expansion Planning (TEP) Analysis
+===================================================
+
+This script runs a two-step analysis:
+1. Baseline DC-OPF: Solves optimal power flow on existing network
+2. Single-Period TEP: Solves transmission expansion planning with candidate lines
+
+The script compares the baseline dispatch with the TEP solution to determine
+if expansion is economically justified.
+
+Output:
+- Prints summary of baseline DC-OPF results
+- Prints summary of TEP results (lines built, costs)
+- Results can be accessed via get_results() methods
+
+Usage:
+    python src/scripts/run_tep.py
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 import sys
 from pathlib import Path
@@ -14,6 +33,11 @@ from src.core.dc_opf import DCOPF
 from src.core.tep import TEP
 
 def main():
+    """
+    Main execution function.
+    
+    Runs baseline DC-OPF followed by single-period TEP analysis.
+    """
     print("="*60)
     print("CME307: Transmission Expansion Planning")
     print("TEP MILP Model")

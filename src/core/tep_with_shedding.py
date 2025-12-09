@@ -1,6 +1,53 @@
 """
-TEP model with load shedding (unserved energy) option
-This makes expansion more attractive by allowing comparison of expansion cost vs. load shedding cost
+Transmission Expansion Planning with Load Shedding
+==================================================
+
+This module extends the base TEP model to allow load shedding (unserved energy)
+as an explicit decision variable with penalty costs. This enables the model to:
+
+1. Handle infeasible scenarios by allowing demand curtailment
+2. Quantify the cost of supply shortages (value of lost load)
+3. Compare expansion costs against load shedding penalties
+
+Mathematical Formulation
+------------------------
+The model extends base TEP by adding load shedding variables s_b ≥ 0:
+
+    min  Σ_c F_c × x_c + Σ_g c_g × p_g + γ × Σ_b s_b     (Investment + Operating + Shedding)
+    
+    s.t. [Power balance with load shedding]
+         Σ_g∈G_b p_g + Σ_l f_l^in - Σ_l f_l^out 
+         + Σ_c f_c^in - Σ_c f_c^out + s_b = d_b          ∀b    (Balance)
+         
+         [All other TEP constraints]
+         s_b ≥ 0                                          ∀b    (Non-negative shedding)
+
+Where:
+    - s_b: Load shed at bus b (MW)
+    - γ: Penalty cost per MW of unserved energy ($/MWh), typically $50,000/MWh (VOLL)
+
+Usage Example
+-------------
+>>> from src.core.data_loader import RTSDataLoader
+>>> from src.core.tep_with_shedding import TEPWithLoadShedding
+>>>
+>>> data = RTSDataLoader('data/RTS_Data/SourceData')
+>>> custom_loads = {101: 500, 102: 300, ...}  # Stressed loads
+>>> 
+>>> # Create model with load shedding enabled
+>>> tep = TEPWithLoadShedding(data, candidate_lines=[], 
+>>>                           line_cost_per_mw=0,  # Disable building
+>>>                           custom_loads=custom_loads,
+>>>                           shedding_cost_per_mw=50000)  # $50k/MWh VOLL
+>>> tep.build_model()
+>>> tep.solve(solver='gurobi')
+>>>
+>>> results = tep.get_results()
+>>> print(f"Total load shed: {results['total_load_shed']} MW")
+>>> print(f"Shedding cost: ${results['load_shedding_cost']:,.0f}")
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 from pyomo.environ import *
 import pandas as pd
@@ -9,22 +56,57 @@ from .data_loader import RTSDataLoader
 from .tep import TEP
 
 class TEPWithLoadShedding(TEP):
-    """TEP model that allows load shedding with high penalty cost"""
+    """
+    TEP model that allows load shedding with penalty cost.
+    
+    This class extends the base TEP model to include load shedding variables
+    that allow the model to curtail demand when supply is insufficient. The
+    penalty cost (typically set to value of lost load, VOLL) makes load
+    shedding expensive but allows the model to remain feasible under extreme
+    stress conditions.
+    
+    Attributes
+    ----------
+    custom_loads : dict
+        Dictionary mapping bus_id -> load (MW) for custom load scenario
+    shedding_cost : float
+        Penalty cost per MW of unserved energy ($/MWh)
+    """
     
     def __init__(self, data_loader, candidate_lines, line_cost_per_mw, custom_loads, 
                  shedding_cost_per_mw=10000):
         """
-        Parameters:
-        -----------
-        shedding_cost_per_mw : float
-            Cost per MW of unserved energy (very high to discourage, but allows feasibility)
+        Initialize TEP model with load shedding capability.
+        
+        Parameters
+        ----------
+        data_loader : RTSDataLoader
+            Data loader instance
+        candidate_lines : list
+            List of candidate line dictionaries (can be empty to disable building)
+        line_cost_per_mw : float
+            Capital cost per MW for candidate lines ($/MW)
+        custom_loads : dict
+            Dictionary mapping bus_id -> load (MW) for stress scenario
+        shedding_cost_per_mw : float, optional
+            Penalty cost per MW of unserved energy ($/MWh), default is 10,000.
+            Typical VOLL (value of lost load) is $50,000/MWh.
         """
         super().__init__(data_loader, candidate_lines, line_cost_per_mw)
         self.custom_loads = custom_loads
         self.shedding_cost = shedding_cost_per_mw
     
     def build_model(self):
-        """Build TEP model with load shedding option"""
+        """
+        Build TEP model with load shedding variables.
+        
+        This method:
+        1. Temporarily replaces load data with custom_loads
+        2. Builds base TEP model
+        3. Adds load_shed variables for each bus
+        4. Modifies power balance constraint to include load shedding
+        5. Updates objective function to include shedding penalty
+        """
         # Temporarily replace load
         original_load = self.data.get_load_by_bus()
         class ModifiedLoader:

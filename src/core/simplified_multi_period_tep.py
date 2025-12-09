@@ -1,7 +1,48 @@
 """
-Simplified Multi-Period TEP using two-stage approach
-Stage 1: Identify congestion periods
-Stage 2: Solve TEP for critical periods only
+Simplified Multi-Period Transmission Expansion Planning
+=======================================================
+
+This module implements a two-stage approach to multi-period TEP that avoids
+the computational complexity of a full multi-period MILP while still capturing
+time-varying load and renewable patterns.
+
+Two-Stage Approach
+------------------
+Stage 1: Identify Peak Congestion Periods
+    - Run DC-OPF across multiple time periods from time series
+    - Identify periods with highest load and/or congestion
+    - Select representative periods for Stage 2
+    
+Stage 2: Solve Aggregated TEP
+    - Solve single-period TEP for peak load scenario
+    - Apply stress multipliers (load increase, line derates)
+    - Investment decisions are made once (not period-indexed)
+
+This approach is more tractable than full multi-period TEP (which can exceed
+Gurobi license limits) while still capturing key time-varying patterns.
+
+Key Features
+------------
+- Uses time series data for realistic load and renewable profiles
+- Identifies critical periods through DC-OPF screening
+- Applies stress multipliers to test system resilience
+- Solves single-period TEP (computationally efficient)
+
+Usage Example
+-------------
+>>> from src.core.data_loader import RTSDataLoader
+>>> from src.core.timeseries_loader import TimeseriesLoader
+>>> from src.core.simplified_multi_period_tep import SimplifiedMultiPeriodTEP
+>>>
+>>> data = RTSDataLoader('data/RTS_Data/SourceData')
+>>> timeseries = TimeseriesLoader('data/RTS_Data')
+>>>
+>>> tep = SimplifiedMultiPeriodTEP(data, timeseries, line_cost_per_mw=200000)
+>>> peak_periods = tep.identify_congestion_periods(n_periods=2)
+>>> success = tep.solve_aggregated_tep(max_candidates=8)
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 from pyomo.environ import *
 import pandas as pd

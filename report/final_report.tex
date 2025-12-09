@@ -115,7 +115,7 @@ To study infeasible periods or deliberate stress tests we add non-negative slack
 \end{align}
 In the implementation, $\gamma$ is the \texttt{shedding\_cost\_per\_mw} argument supplied to \texttt{TEPWithLoadShedding}; we set $\gamma=\$50{,}000$/MWh in \texttt{run\_load\_shedding\_analysis.py} as a value-of-lost-load (VOLL) penalty when quantifying shortages in Section~\ref{sec:loadshed}.
 
-\section{Baseline DC-OPF Benchmark}
+    \section{Baseline DC-OPF Benchmark}
 The starting point is the static DC-OPF implemented in \texttt{src/core/dc\_opf.py}. The DC-OPF is a linear program that minimizes total generation cost subject to power balance, DC power flow equations, generator limits, and transmission thermal limits. Table~\ref{tab:baseline} compares the baseline dispatch with the single-period TEP result.
 
 The grid satisfies the full 8,550~MW of system load at a \$138,967 operating cost. Three inter-regional transmission corridors operate at their thermal limits (100\% utilization):
@@ -327,6 +327,103 @@ The robust formulation differs fundamentally from single-scenario TEP: instead o
 
 The weighted objective value is \$61.46M, dominated by capital expenditure. This highlights the core tradeoff in robust planning: upfront investment cost versus guaranteed feasibility under stress.
 
+\section{Bus Redundancy Analysis}
+To further characterize network resilience, we performed an N-1 bus contingency analysis to identify which buses can be removed while maintaining system operability. This analysis helps identify:
+\begin{itemize}
+    \item \textbf{Redundant buses}: Can be removed without causing islanding or infeasibility
+    \item \textbf{Critical buses}: Their removal causes network disconnection or operational failure
+\end{itemize}
+
+\subsection{Methodology}
+For each of the 73 buses, we:
+\begin{enumerate}
+    \item Remove the bus and all connected branches from the network graph
+    \item Check if the remaining network is still connected (no islanding)
+    \item Solve the DC-OPF on the reduced network with relaxed minimum generation constraints
+    \item Classify the bus based on feasibility and impact
+\end{enumerate}
+
+A bus is classified as \textbf{redundant} if after its removal: (1) the network remains connected, (2) the DC-OPF is feasible, and (3) load shedding is less than 1~MW.
+
+\subsection{Results}
+Table~\ref{tab:redundancy-summary} summarizes the bus redundancy analysis. The results reveal a highly resilient network structure.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{lcc}
+        \toprule
+        Classification & Count & Percentage \\
+        \midrule
+        Redundant buses & 69 & 94.5\% \\
+        Critical buses & 4 & 5.5\% \\
+        \midrule
+        \textbf{Total} & 73 & 100\% \\
+        \bottomrule
+    \end{tabular}
+    \caption{Bus redundancy classification summary. The vast majority of buses are redundant.}
+    \label{tab:redundancy-summary}
+\end{table}
+
+\subsection{Critical Bus Identification}
+Only four buses were identified as critical, listed in Table~\ref{tab:critical-buses}.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{cccl}
+        \toprule
+        Bus ID & Region & Load [MW] & Criticality Reason \\
+        \midrule
+        208 & 2 & 171 & Network splits into 2 islands \\
+        308 & 3 & 171 & Network splits into 2 islands \\
+        209 & 2 & 175 & Requires 11 MW load shedding \\
+        210 & 2 & 195 & Requires 11 MW load shedding \\
+        \bottomrule
+    \end{tabular}
+    \caption{Critical buses and their failure modes. Buses 208 and 308 are articulation points whose removal disconnects the network.}
+    \label{tab:critical-buses}
+\end{table}
+
+Buses 208 and 308 are \textbf{articulation points} (cut vertices) in the network graph---their removal disconnects portions of the grid, creating electrical islands. Buses 209 and 210 in Region~2 are critical because their removal requires modest load shedding (11~MW), indicating they serve loads that cannot be fully supplied through alternative paths.
+
+\subsection{Regional Analysis}
+Figure~\ref{fig:redundancy-map} shows the spatial distribution of redundant and critical buses. The analysis by region reveals:
+\begin{itemize}
+    \item \textbf{Region 1}: 24/24 buses redundant (100\%)---most resilient
+    \item \textbf{Region 2}: 21/24 buses redundant (87.5\%)---contains all critical buses
+    \item \textbf{Region 3}: 24/25 buses redundant (96\%)
+\end{itemize}
+
+Region~2 contains all four critical buses, suggesting it has the weakest topological structure. Buses 208 and 308 appear to be key interconnection points between sub-networks.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{../results/plots/bus_redundancy_map.png}
+    \caption{Bus redundancy map showing critical buses (red/orange) and redundant buses (green). The four critical buses are labeled. Node size reflects bus load and generation capacity.}
+    \label{fig:redundancy-map}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{../results/plots/bus_criticality_summary.png}
+    \caption{Bus criticality analysis summary. Top left: overall classification. Top right: redundancy by region. Bottom left: reasons for criticality. Bottom right: load distribution by classification.}
+    \label{fig:criticality-summary}
+\end{figure}
+
+\subsection{Implications}
+The high redundancy rate (94.5\%) confirms that the RTS-GMLC network is robustly designed with significant topological margin. Key implications:
+
+\begin{enumerate}
+    \item \textbf{Network simplification}: Most buses could theoretically be consolidated or bypassed during maintenance without impacting system operability.
+    
+    \item \textbf{Protection priorities}: Buses 208 and 308 are critical infrastructure that should be prioritized for protection and maintenance, as their failure would cause islanding.
+    
+    \item \textbf{Regional vulnerability}: Region~2's concentration of critical buses suggests it may benefit from targeted reinforcement to improve resilience.
+    
+    \item \textbf{Design validation}: The low number of critical buses (5.5\%) indicates the network was designed with redundancy in mind, consistent with reliability standards.
+\end{enumerate}
+
+This analysis complements the TEP findings: the network's inherent topological redundancy helps explain why expansion is rarely economically justified---the system already has multiple paths for power delivery.
+
 \section{Implementation Summary}
 Table~\ref{tab:scripts} summarizes the entry-point scripts and their roles in the analysis pipeline.
 
@@ -344,6 +441,7 @@ Table~\ref{tab:scripts} summarizes the entry-point scripts and their roles in th
         \texttt{run\_multi\_period\_tep.py} & Full multi-period MILP (may hit Gurobi WLS size limits on academic licenses). \\
         \texttt{run\_load\_shedding\_analysis.py} & Disables building, adds \$50k/MWh penalty; quantifies shortage costs (\$88--110M/period). \\
         \texttt{run\_robust\_tep.py} & Three-scenario robust TEP; builds 2 lines at \$61.3M for cross-scenario feasibility. \\
+        \texttt{run\_redundancy\_analysis.py} & N-1 bus contingency analysis; identifies 69/73 (94.5\%) redundant buses and 4 critical buses. \\
         \bottomrule
     \end{tabular}
     \caption{Summary of analysis scripts and their key findings.}
@@ -354,20 +452,28 @@ Table~\ref{tab:scripts} summarizes the entry-point scripts and their roles in th
 All models were solved using Gurobi 13.0+ on the Gurobi Web License Service (WLS). Model sizes range from 798 constraints (simplified TEP) to several thousand (full multi-period and robust formulations). The academic WLS license imposes limits on model size (rows, columns, nonzeros); the simplified two-stage approach keeps models within these limits. Solution times were typically under 1 second for single-period models and under 10 seconds for robust formulations.
 
 \section{Conclusions}
-Across the deterministic and time-series experiments, the RTS-GMLC system behaves as a resilient grid: even with 150\% load multipliers, added industrial demand, and derated interfaces, the models prefer redispatch to new construction. This aligns with our project objectives by demonstrating that congestion alone does not justify expansion under current load and renewable profiles.
+
+This study evaluates transmission expansion planning on the IEEE RTS-GMLC system through deterministic, multi-period, and robust optimization models. We demonstrate that the network exhibits remarkable operational flexibility, with expansion becoming economically rational only under extreme simultaneous stress conditions that cannot be resolved through generation redispatch alone.
 
 \subsection{Key Findings}
+
 \begin{enumerate}
-    \item \textbf{System Robustness}: The RTS-GMLC network has significant inherent redundancy. It can handle extreme stress (150\% load, +500 MW new demand) through generation redispatch without requiring transmission expansion.
+    \item \textbf{System Robustness}: The RTS-GMLC network demonstrates exceptional redundancy: 94.5\% of buses (69/73) are redundant and can be removed without network failure. Under extreme stress (150\% load, +500~MW demand, 6,661~MW peak), the system meets demand through redispatch without expansion, with operating cost of \$129,078 compared to baseline \$138,967. This indicates that well-designed networks can accommodate significant load growth through operational adjustments rather than new infrastructure.
     
-    \item \textbf{Congestion Management}: Three inter-regional ties (A27, CA-1, CB-1) operate at thermal limits under base conditions. However, the system accommodates this congestion by adjusting the generation dispatch, demonstrating that congestion does not automatically imply an expansion need.
+    \item \textbf{Congestion Does Not Imply Expansion}: Three corridors operate at thermal limits (A27, CA-1, CB-1: all 500/500~MW), yet TEP models with capital costs from \$100k/MW to \$1M/MW consistently choose zero expansion. Operating cost remains flat at \$138,967 across all cost levels, indicating negligible economic benefit from congestion relief. This challenges the heuristic that observed congestion automatically justifies investment, suggesting congestion must be evaluated in context of system-wide flexibility.
     
-    \item \textbf{Economic Threshold}: Our cost sensitivity analysis found no break-even point where expansion becomes attractive, even at capital costs as low as \$100k/MW. Operating cost savings from congestion relief are negligible.
+    \item \textbf{Economic Threshold}: Cost sensitivity analysis across 10 logarithmically-spaced points (\$100k/MW to \$1M/MW) reveals no break-even point where expansion becomes attractive. Even at \$100k/MW (a \$50M investment for 500~MW), operating cost savings are insufficient to justify capital expenditure. This holds across multiple cost models, indicating the system has significant capacity margin and expansion may only be justified under substantial load growth or extreme events.
     
-    \item \textbf{Scarcity Pricing}: The load shedding analysis assigns concrete costs to unmet demand---\$88--110M per stressed period at \$50k/MWh VOLL. This provides a benchmark against which resilience investments can be evaluated.
+    \item \textbf{Scarcity Pricing}: Load shedding analysis quantifies supply shortages: 37.3--49.1\% of demand shed across 12 periods, with penalties of \$86.7--140.4M per period at \$50k/MWh VOLL. The system prioritizes load serving through available generation (2,910~MW ceiling), with load shedding as last resort. At \$50k/MWh VOLL, 2,000~MW curtailment costs \$100M per hour, providing a benchmark for evaluating resilience investments.
     
-    \item \textbf{Robustness Drives Investment}: The only formulation that triggers expansion is scenario-based robust TEP. When required to satisfy simultaneous load growth (+20\%), renewable drought (-30\%), and severe branch derates (-60\% on congested lines), the model builds two 200~MW ties at \$61.3M total cost.
+    \item \textbf{Robustness Drives Investment}: Only scenario-based robust TEP triggers expansion. Under simultaneous load growth (+20\%), renewable drought (-30\%), and severe branch derates (40\% on congested lines), the model builds two 200~MW lines (Bus 101$\rightarrow$106, 101$\rightarrow$117) at \$61.3M. This highlights the difference between deterministic and robust optimization: deterministic models exploit favorable conditions independently, while robust models hedge against worst-case combinations. Expansion occurs only under extreme simultaneous stresses, suggesting the system is well-designed for typical variability.
+    
+    \item \textbf{Topological Redundancy}: N-1 bus analysis shows only 4 critical buses (5.5\%): buses 208 and 308 cause islanding, while 209 and 210 require 11~MW load shedding. Region~1 is 100\% redundant; Region~2 contains all critical buses. This high redundancy (94.5\%) explains why expansion is rarely justified: the network provides multiple power delivery paths, allowing adaptation through topology rather than new infrastructure.
 \end{enumerate}
+
+\subsection{Limitations}
+
+Our analysis has several limitations: (1) DC power flow ignores reactive power, voltage stability, and losses. (2) Fixed topology excludes dynamic reconfiguration and FACTS devices. (3) Simplified cost models omit site-specific factors. (4) Discrete scenarios rather than continuous probability distributions. (5) Limited to 12 representative periods rather than full-year analysis. (6) No N-1 security constraints. (7) Fixed generation portfolio without retirements or new capacity. (8) No storage or demand response alternatives. (9) RTS-GMLC is a synthetic test system. (10) Regulatory and policy factors not modeled. Despite these limitations, our analysis provides insights into when transmission expansion becomes economically justified.
 
 \subsection{Future Work}
 Consistent with our original project goals, several extensions would strengthen this analysis:

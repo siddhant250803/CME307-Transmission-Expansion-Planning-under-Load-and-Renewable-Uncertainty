@@ -1,5 +1,25 @@
 """
-Run scenario-based robust TEP.
+Scenario-Based Robust Transmission Expansion Planning
+=====================================================
+
+This script runs a robust TEP model that requires a single investment plan
+to satisfy multiple stress scenarios simultaneously.
+
+Scenarios:
+- base: Nominal conditions
+- high_load_low_renew: 20% load increase, 30% renewable reduction, severe branch derates
+- low_load_high_renew: 10% load decrease, 15% renewable increase
+
+The model finds the minimal investment that ensures feasibility across all scenarios.
+
+Output:
+- results/robust_tep_summary.csv: Scenario-level results
+
+Usage:
+    python src/scripts/run_robust_tep.py
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 from __future__ import annotations
 
@@ -17,6 +37,12 @@ from src.core.scenario_robust_tep import Scenario, ScenarioRobustTEP
 
 
 def main():
+    """
+    Main execution function.
+    
+    Defines three scenarios and solves robust TEP to find investment plan
+    that satisfies all scenarios simultaneously.
+    """
     print("=" * 70)
     print("Scenario-Based Robust Transmission Expansion Planning")
     print("=" * 70)

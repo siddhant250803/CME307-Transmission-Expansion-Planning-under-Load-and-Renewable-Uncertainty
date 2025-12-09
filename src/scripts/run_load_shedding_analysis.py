@@ -1,12 +1,25 @@
 """
-Analyze supply-shortage scenarios using the DC OPF model with load shedding.
+Load Shedding Stress Test Analysis
+==================================
 
-The script:
-1. Loads RTS-GMLC network and time-series data.
-2. Builds nodal loads for selected time periods.
-3. Derates generator capacities to emulate large outages.
-4. Solves a DC OPF with load shedding (using TEPWithLoadShedding with zero candidates).
-5. Records the amount and cost of unserved energy and saves results to CSV.
+This script performs a supply shortage stress test by:
+1. Derating all generators to 20% of nameplate capacity (simulating outages)
+2. Increasing loads by 40% (stress multiplier)
+3. Solving DC-OPF with load shedding enabled (penalty: $50k/MWh VOLL)
+4. Quantifying the amount and cost of unserved energy
+
+The analysis runs across 12 representative periods to understand how load
+shedding varies with demand patterns. This provides a quantitative benchmark
+for evaluating resilience investments.
+
+Output:
+- results/load_shedding_periods.csv: Period-by-period load shedding results
+
+Usage:
+    python src/scripts/run_load_shedding_analysis.py
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 from __future__ import annotations
 
@@ -113,7 +126,7 @@ def solve_with_load_shedding(
 
 
 def main():
-    periods = [1, 2, 3, 4, 5, 6]
+    periods = list(range(1, 13))  # All 12 periods
     availability_factor = 0.2
     stress_multiplier = 1.40
     shedding_cost = 50_000.0

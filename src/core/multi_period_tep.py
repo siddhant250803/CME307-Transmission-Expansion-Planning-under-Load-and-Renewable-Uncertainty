@@ -1,5 +1,59 @@
 """
-Multi-period Transmission Expansion Planning model with time series data
+Full Multi-Period Transmission Expansion Planning Model
+========================================================
+
+This module implements a complete multi-period TEP MILP where operational
+variables (generation, flows, angles) are indexed by time period, while
+investment decisions remain static across all periods.
+
+WARNING: This model can be computationally intensive and may exceed Gurobi
+Web License Service (WLS) size limits for academic licenses. Consider using
+SimplifiedMultiPeriodTEP for a more tractable alternative.
+
+Mathematical Formulation
+------------------------
+The model extends base TEP with period-indexed operational variables:
+
+    min  Σ_c F_c × x_c + Σ_t Σ_g c_g × p_{g,t}     (Investment + Operating Cost)
+    
+    s.t. [Power balance for each period]
+         Σ_g∈G_b p_{g,t} + Σ_l f_{l,t}^in - Σ_l f_{l,t}^out 
+         + Σ_c f_{c,t}^in - Σ_c f_{c,t}^out = d_{b,t}     ∀b, ∀t    (Balance)
+         
+         [DC flow for each period]
+         f_{l,t} = B_l × (θ_{i,t} - θ_{j,t})              ∀l, ∀t    (DC Flow)
+         
+         [Investment shared across periods]
+         x_c ∈ {0, 1}                                      ∀c        (Binary)
+
+Where t indexes time periods (e.g., representative hours from time series).
+
+Key Features
+------------
+- Period-indexed operational variables (generation, flows, angles)
+- Static investment decisions (same for all periods)
+- Time-varying loads and renewable generation from time series
+- Representative period selection (peak/avg/low or k-means)
+
+Usage Example
+-------------
+>>> from src.core.data_loader import RTSDataLoader
+>>> from src.core.timeseries_loader import TimeseriesLoader
+>>> from src.core.multi_period_tep import MultiPeriodTEP
+>>>
+>>> data = RTSDataLoader('data/RTS_Data/SourceData')
+>>> timeseries = TimeseriesLoader('data/RTS_Data')
+>>>
+>>> tep = MultiPeriodTEP(data, timeseries, line_cost_per_mw=1000000)
+>>> tep.prepare_time_series(n_periods=12)
+>>> tep.build_model()
+>>> tep.solve(solver='gurobi')
+
+Note: Model size grows rapidly with number of periods. For academic licenses,
+consider using SimplifiedMultiPeriodTEP instead.
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 from pyomo.environ import *
 import pandas as pd

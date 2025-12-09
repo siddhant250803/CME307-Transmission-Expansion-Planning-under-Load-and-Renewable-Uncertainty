@@ -1,8 +1,86 @@
 """
-Scenario-based robust Transmission Expansion Planning model.
+Scenario-Based Robust Transmission Expansion Planning (TEP) Model
+==================================================================
 
-This module extends the base TEP formulation so that a single investment plan
-must withstand multiple load / generation scenarios simultaneously.
+This module extends the base TEP formulation to require that a single investment
+plan (binary build decisions) must satisfy multiple load/generation scenarios
+simultaneously. This is a robust optimization approach that hedges against
+uncertainty by ensuring feasibility across a set of stress scenarios.
+
+Mathematical Formulation
+------------------------
+The robust TEP model extends the base TEP with scenario-indexed operational variables:
+
+    min  Σ_c F_c × x_c + Σ_s w_s × Σ_g c_g × p_{g,s}     (Investment + Weighted Operating Cost)
+    
+    s.t. [Power balance for each scenario]
+         Σ_g∈G_b p_{g,s} + Σ_l f_{l,s}^in - Σ_l f_{l,s}^out 
+         + Σ_c f_{c,s}^in - Σ_c f_{c,s}^out = d_{b,s}     ∀b, ∀s    (Balance)
+         
+         [DC flow equations for each scenario]
+         f_{l,s} = B_l × (θ_{i,s} - θ_{j,s})              ∀l, ∀s    (DC Flow - Existing)
+         [Big-M for candidates, scenario-indexed]
+         -M × x_c ≤ f_{c,s} ≤ M × x_c                     ∀c, ∀s    (Zero if not built)
+         -f̄_c × x_c ≤ f_{c,s} ≤ f̄_c × x_c              ∀c, ∀s    (Candidate Limits)
+         
+         [Scenario-specific limits]
+         -f̄_{l,s} ≤ f_{l,s} ≤ f̄_{l,s}                  ∀l, ∀s    (Branch Limits)
+         p_{g,s}^min ≤ p_{g,s} ≤ p_{g,s}^max              ∀g, ∀s    (Generator Limits)
+         x_c ∈ {0, 1}                                      ∀c        (Binary - Same for all scenarios)
+
+Key Features
+------------
+- Single investment plan (x_c) shared across all scenarios
+- Scenario-indexed operational variables (generation, flows, angles)
+- Scenario-specific load scaling, renewable availability, and branch derates
+- Weighted objective function (weighted average operating cost across scenarios)
+- Big-M formulation for candidate lines (same as base TEP)
+
+Scenario Definition
+-------------------
+Each scenario specifies:
+- load_scale: Multiplier for base load (e.g., 1.2 = 20% increase)
+- renewable_scale: Multiplier for renewable capacity (e.g., 0.7 = 30% reduction)
+- thermal_scale: Multiplier for thermal generator capacity
+- branch_scale: Global multiplier for all branch ratings
+- branch_overrides: Specific multipliers for individual branches (e.g., derates)
+- weight: Weight in objective function (normalized automatically)
+
+Usage Example
+-------------
+>>> from src.core.data_loader import RTSDataLoader
+>>> from src.core.scenario_robust_tep import ScenarioRobustTEP, Scenario
+>>>
+>>> data = RTSDataLoader('data/RTS_Data/SourceData')
+>>> 
+>>> # Define scenarios
+>>> scenarios = [
+>>>     Scenario('base', load_scale=1.0, renewable_scale=1.0, weight=0.4),
+>>>     Scenario('high_load', load_scale=1.2, renewable_scale=0.7, 
+>>>              branch_scale=0.85, branch_overrides={'A27': 0.4}, weight=0.35),
+>>>     Scenario('low_load', load_scale=0.9, renewable_scale=1.15, weight=0.25)
+>>> ]
+>>>
+>>> # Create and solve robust TEP
+>>> robust_tep = ScenarioRobustTEP(data, scenarios, line_cost_per_mw=120000)
+>>> robust_tep.generate_candidate_lines(max_candidates=30)
+>>> robust_tep.build_model()
+>>> robust_tep.solve(solver='gurobi')
+>>>
+>>> # Get results
+>>> results = robust_tep.get_results()
+>>> print(f"Lines built: {len(results['lines_built'])}")
+>>> print(f"Investment: ${results['investment_cost']:,.0f}")
+
+References
+----------
+- Ruiz, C., & Conejo, A. J. (2015). Robust transmission expansion planning.
+  European Journal of Operational Research, 242(2), 390-401.
+- Conejo, A. J., et al. (2006). Decomposition techniques in mathematical programming.
+  Springer.
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 from __future__ import annotations
 
@@ -30,11 +108,39 @@ from .data_loader import RTSDataLoader
 from .tep import TEP
 
 
+# Set of renewable generator unit types (used to identify which generators
+# are affected by renewable_scale vs thermal_scale)
 RENEWABLE_TYPES = {"WIND", "PV", "CSP", "HYDRO", "ROR"}
 
 
 @dataclass
 class Scenario:
+    """
+    Scenario definition for robust TEP.
+    
+    Each scenario represents a different future condition (load, renewable availability,
+    branch capacity) that the investment plan must satisfy.
+    
+    Attributes
+    ----------
+    name : str
+        Unique identifier for the scenario
+    load_scale : float, optional
+        Multiplier for base load (default 1.0). 1.2 = 20% increase.
+    renewable_scale : float, optional
+        Multiplier for renewable generator capacity (default 1.0). 0.7 = 30% reduction.
+    thermal_scale : float, optional
+        Multiplier for thermal (non-renewable) generator capacity (default 1.0)
+    branch_scale : float, optional
+        Global multiplier for all branch thermal ratings (default 1.0)
+    branch_overrides : dict, optional
+        Specific multipliers for individual branches by UID (default None).
+        Overrides branch_scale for specified branches.
+    weight : float, optional
+        Weight in objective function (default 1.0). Automatically normalized.
+    description : str, optional
+        Human-readable description of the scenario (default "")
+    """
     name: str
     load_scale: float = 1.0
     renewable_scale: float = 1.0
@@ -46,7 +152,31 @@ class Scenario:
 
 
 class ScenarioRobustTEP(TEP):
-    """Multi-scenario TEP model."""
+    """
+    Scenario-based robust Transmission Expansion Planning model.
+    
+    This class extends the base TEP model to require that a single investment
+    plan (binary build decisions) satisfies multiple scenarios simultaneously.
+    Operational variables (generation, flows, angles) are indexed by scenario,
+    while investment variables are shared across all scenarios.
+    
+    The objective function is: Investment Cost + Weighted Average Operating Cost
+    where the weighted average is computed across all scenarios using scenario weights.
+    
+    Key Differences from Base TEP
+    ------------------------------
+    1. Operational variables are scenario-indexed (p_gen[g, s], p_flow[l, s], etc.)
+    2. Investment variables are NOT scenario-indexed (build_line[c] is shared)
+    3. Each scenario can have different loads, generator capacities, and branch ratings
+    4. Objective includes weighted average operating cost across scenarios
+    
+    Attributes
+    ----------
+    scenarios : list[Scenario]
+        List of scenario definitions
+    scenario_map : dict
+        Dictionary mapping scenario name -> Scenario object
+    """
 
     def __init__(
         self,
@@ -60,7 +190,26 @@ class ScenarioRobustTEP(TEP):
         self.scenario_map = {s.name: s for s in scenarios}
 
     def build_model(self):
-        """Build Pyomo model with scenario-indexed operational variables."""
+        """
+        Build Pyomo model with scenario-indexed operational variables.
+        
+        This method creates a MILP model where:
+        - Investment decisions (build_line) are shared across all scenarios
+        - Operational variables (generation, flows, angles) are indexed by scenario
+        - Each scenario has its own load, generator capacity, and branch rating parameters
+        - The objective minimizes investment cost plus weighted average operating cost
+        
+        The model structure:
+        1. Sets: buses, generators, branches, candidates, scenarios
+        2. Parameters: scenario weights, generator costs/capacities, loads, branch ratings
+        3. Variables: build_line (binary), p_gen[g, s], theta[b, s], p_flow[l, s], p_flow_candidate[c, s]
+        4. Constraints: power balance (per scenario), DC flow, Big-M for candidates, limits
+        
+        Raises
+        ------
+        ValueError
+            If scenarios list is empty
+        """
         if not self.scenarios:
             raise ValueError("Scenario list is empty.")
 
@@ -309,6 +458,21 @@ class ScenarioRobustTEP(TEP):
         self.model.ref_bus = Constraint(self.model.scenarios, rule=ref_rule)
 
     def solve(self, solver: str = "gurobi", time_limit: int = 3600):
+        """
+        Solve the scenario-robust TEP MILP model.
+        
+        Parameters
+        ----------
+        solver : str, optional
+            Solver name ('gurobi' or 'glpk'), default is 'gurobi'
+        time_limit : int, optional
+            Maximum solve time in seconds, default is 3600
+            
+        Returns
+        -------
+        bool
+            True if solution found (optimal or feasible), False otherwise
+        """
         if self.model is None:
             self.build_model()
 
@@ -329,6 +493,24 @@ class ScenarioRobustTEP(TEP):
             return False
 
     def get_results(self):
+        """
+        Extract results from solved model.
+        
+        Returns
+        -------
+        dict
+            Dictionary containing:
+            - 'objective_value': Total weighted objective value
+            - 'investment_cost': Total capital expenditure
+            - 'scenario_results': Dict mapping scenario name -> {
+                'total_load': float,
+                'total_generation': float,
+                'operating_cost': float
+              }
+            - 'lines_built': List of dicts with candidate line details
+              
+        Returns None if model not solved.
+        """
         if self.model is None or self.results is None:
             return None
 

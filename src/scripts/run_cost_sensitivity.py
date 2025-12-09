@@ -1,6 +1,28 @@
 """
-Run TEP with cost sensitivity analysis
-Sweeps over different line cost parameters to see when expansion becomes attractive
+Cost Sensitivity Analysis for Transmission Expansion Planning
+============================================================
+
+This script performs a cost sensitivity analysis by solving TEP models across
+a range of capital cost parameters. The goal is to identify the break-even point
+where transmission expansion becomes economically attractive.
+
+Methodology:
+1. Run baseline DC-OPF to establish reference operating cost
+2. Sweep line capital costs from $100k/MW to $1M/MW (10 logarithmically-spaced points)
+3. For each cost level, solve TEP and record:
+   - Number of lines built
+   - Operating cost
+   - Investment cost
+   - Net benefit (operating savings - investment cost)
+
+Output:
+- results/cost_sensitivity.csv: Detailed results for each cost level
+
+Usage:
+    python src/scripts/run_cost_sensitivity.py
+
+Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
+Date: December 2025
 """
 import sys
 from pathlib import Path
@@ -17,7 +39,12 @@ from src.core.dc_opf import DCOPF
 from src.core.tep import TEP
 
 def run_cost_sensitivity():
-    """Run TEP for different cost parameters"""
+    """
+    Run cost sensitivity analysis.
+    
+    Sweeps line capital costs from $100k/MW to $1M/MW and solves TEP at each
+    level to determine when expansion becomes economically justified.
+    """
     print("="*60)
     print("CME307: TEP Cost Sensitivity Analysis")
     print("="*60)

@@ -1,100 +1,4 @@
-"""
-Transmission Expansion Planning (TEP) MILP Model
-=================================================
-
-This module implements a Mixed-Integer Linear Programming (MILP) formulation
-for Transmission Expansion Planning. TEP determines the optimal set of new
-transmission lines to build while minimizing total system cost.
-
-Mathematical Formulation
-------------------------
-The TEP model extends DC-OPF with binary investment decisions:
-
-    min  Σ_c F_c × x_c + Σ_g c_g × p_g                    (Investment + Operating Cost)
-    
-    s.t. [Power balance with candidate flows]
-         Σ_g∈G_b p_g + Σ_l f_l^in - Σ_l f_l^out 
-         + Σ_c f_c^in - Σ_c f_c^out = d_b                  ∀b    (Balance)
-         
-         f_l = B_l × (θ_i - θ_j)                           ∀l    (DC Flow - Existing)
-         
-         [Big-M formulation for candidate lines]
-         f_c - B_c × (θ_i - θ_j) ≤ M(1 - x_c)             ∀c    (DC Flow - Candidate Upper)
-         f_c - B_c × (θ_i - θ_j) ≥ -M(1 - x_c)            ∀c    (DC Flow - Candidate Lower)
-         -M × x_c ≤ f_c ≤ M × x_c                          ∀c    (Zero flow if not built)
-         
-         -f̄_c × x_c ≤ f_c ≤ f̄_c × x_c                    ∀c    (Candidate Limits)
-         -f̄_l ≤ f_l ≤ f̄_l                                 ∀l    (Existing Limits)
-         p_g^min ≤ p_g ≤ p_g^max                           ∀g    (Generator Limits)
-         x_c ∈ {0, 1}                                      ∀c    (Binary Build Decisions)
-
-Where:
-    - x_c: Binary variable (1 if candidate line c is built, 0 otherwise)
-    - F_c: Capital cost of building candidate line c ($)
-    - f_c: Power flow on candidate line c (MW)
-    - M: Big-M constant (large number for constraint relaxation)
-
-Big-M Formulation Explained
----------------------------
-The key challenge in TEP is coupling the DC flow equation to the binary build
-decision. We use a Big-M formulation:
-
-1. If x_c = 1 (line built):
-   - The Big-M terms vanish, enforcing f_c = B_c × Δθ
-   - Flow is bounded by [-f̄_c, f̄_c]
-
-2. If x_c = 0 (line not built):
-   - Big-M relaxes the DC flow constraint (any flow "allowed" by math)
-   - BUT the zero-flow constraints force f_c = 0
-
-This creates a valid disjunction: either the line exists with DC flow physics,
-or it doesn't exist and carries no flow.
-
-Cost Models
------------
-Three capital cost models are supported:
-
-1. **capacity_distance**: cost = $/MW × MW × (distance_km / 100)
-   - Scales with both capacity and distance
-   - May overestimate costs for short high-capacity lines
-
-2. **distance_based**: cost = $/mile × miles (varies by voltage)
-   - Most realistic: based on MISO/FERC industry data
-   - 230 kV: ~$1.5M/mile, 345 kV: ~$2.5M/mile, 500 kV: ~$4M/mile
-
-3. **capacity_only**: cost = $/MW × MW
-   - Simplest model, ignores distance
-   - Useful for sensitivity analysis
-
-Usage Example
--------------
->>> from src.core.data_loader import RTSDataLoader
->>> from src.core.tep import TEP
->>>
->>> # Load data
->>> data = RTSDataLoader('data/RTS_Data/SourceData')
->>>
->>> # Create TEP with custom cost
->>> tep = TEP(data, line_cost_per_mw=200000, cost_model='distance_based')
->>> tep.build_model()
->>> tep.solve(solver='gurobi')
->>>
->>> # Check results
->>> results = tep.get_results()
->>> print(f"Lines built: {len(results['lines_built'])}")
-
-References
-----------
-- Garver, L. L. (1970). Transmission network estimation using linear programming.
-  IEEE Transactions on Power Apparatus and Systems, 89(7), 1688-1697.
-- Conejo, A. J., et al. (2006). Decomposition techniques in mathematical programming.
-  Springer.
-- Ruiz, C., & Conejo, A. J. (2015). Robust transmission expansion planning.
-  European Journal of Operational Research, 242(2), 390-401.
-
-Author: CME307 Team (Edouard Rabasse, Siddhant Sukhani)
-Date: December 2025
-"""
+"""Transmission Expansion Planning MILP model."""
 
 from pyomo.environ import (
     ConcreteModel, Set, Param, Var, Objective, Constraint,
@@ -108,66 +12,14 @@ from .data_loader import RTSDataLoader
 
 
 class TEP:
-    """
-    Transmission Expansion Planning MILP Model.
-    
-    This class implements a single-period TEP formulation that determines
-    optimal transmission line investments to minimize total system cost
-    (capital investment + operating cost).
-    
-    Attributes
-    ----------
-    data : RTSDataLoader
-        Data loader with bus, branch, and generator information
-    line_cost_per_mw : float
-        Base cost parameter for candidate lines ($/MW)
-    cost_model : str
-        Cost calculation method: 'capacity_distance', 'distance_based', or 'capacity_only'
-    candidate_lines : list
-        List of candidate line dictionaries
-    model : pyomo.ConcreteModel
-        The Pyomo MILP model
-    results : pyomo.SolverResults
-        Solver results after optimization
-    
-    Methods
-    -------
-    generate_candidate_lines(max_candidates=50)
-        Automatically generate candidate transmission corridors
-    build_model()
-        Construct the Pyomo TEP model
-    solve(solver='gurobi', time_limit=3600)
-        Solve the MILP optimization
-    get_results()
-        Extract solution values
-    print_summary()
-        Print formatted results summary
-    """
+    """Transmission Expansion Planning MILP model."""
     
     def __init__(self, 
                  data_loader: RTSDataLoader, 
                  candidate_lines: Optional[List[Dict]] = None, 
                  line_cost_per_mw: float = 1_000_000,
                  cost_model: str = 'capacity_distance'):
-        """
-        Initialize TEP model.
-        
-        Parameters
-        ----------
-        data_loader : RTSDataLoader
-            Data loader instance with network data
-        candidate_lines : list of dict, optional
-            Custom candidate lines. Each dict should have:
-            {'from_bus': int, 'to_bus': int, 'capacity': float, 'cost': float}
-            If None, candidates are auto-generated.
-        line_cost_per_mw : float
-            Base capital cost per MW (default: $1M/MW)
-        cost_model : str
-            Cost calculation method:
-            - 'capacity_distance': cost = $/MW × MW × (dist/100km)
-            - 'distance_based': cost = $/mile × miles (by voltage)
-            - 'capacity_only': cost = $/MW × MW
-        """
+        """Initialize TEP model."""
         self.data = data_loader
         self.line_cost_per_mw = line_cost_per_mw
         self.cost_model = cost_model
@@ -176,29 +28,7 @@ class TEP:
         self.results = None
         
     def generate_candidate_lines(self, max_candidates: int = 50) -> List[Dict]:
-        """
-        Automatically generate candidate transmission lines.
-        
-        Candidate lines are generated between buses in the same or adjacent
-        areas that are not already connected. This reflects practical
-        transmission planning where new lines typically reinforce existing
-        corridors or connect nearby regions.
-        
-        Parameters
-        ----------
-        max_candidates : int
-            Maximum number of candidates to generate
-            
-        Returns
-        -------
-        list
-            List of candidate line dictionaries with keys:
-            - 'from_bus': Source bus ID
-            - 'to_bus': Destination bus ID
-            - 'capacity': Line rating (MW)
-            - 'cost': Capital cost ($)
-            - 'susceptance': Line susceptance (p.u.)
-        """
+        """Automatically generate candidate transmission lines."""
         if self.candidate_lines is not None:
             return self.candidate_lines
         
@@ -268,100 +98,50 @@ class TEP:
     
     def _calculate_line_cost(self, capacity_mw: float, distance_miles: float, 
                              voltage_kv: float) -> float:
-        """
-        Calculate transmission line capital cost.
-        
-        Three cost models are supported to allow sensitivity analysis:
-        
-        1. capacity_distance: Combines capacity and distance
-        2. distance_based: Industry-standard per-mile costs by voltage
-        3. capacity_only: Simple per-MW cost
-        
-        Parameters
-        ----------
-        capacity_mw : float
-            Line capacity in MW
-        distance_miles : float
-            Line length in miles
-        voltage_kv : float
-            Nominal voltage in kV
-            
-        Returns
-        -------
-        float
-            Total capital cost in dollars
-        """
+        """Calculate transmission line capital cost."""
         if self.cost_model == 'capacity_distance':
-            # Original model: cost scales with capacity and distance
             dist_km = distance_miles / 0.621371
             cost = self.line_cost_per_mw * capacity_mw * (dist_km / 100.0)
-        
         elif self.cost_model == 'distance_based':
-            # Industry-standard costs based on MISO/FERC data
-            # Source: MISO Transmission Cost Estimation Guide
             cost_per_mile = {
-                138: 1.0e6,   # $1M/mile for 138 kV
-                230: 1.5e6,   # $1.5M/mile for 230 kV
-                345: 2.5e6,   # $2.5M/mile for 345 kV
-                500: 4.0e6,   # $4M/mile for 500 kV
-                765: 6.0e6    # $6M/mile for 765 kV
+                138: 1.0e6,
+                230: 1.5e6,
+                345: 2.5e6,
+                500: 4.0e6,
+                765: 6.0e6
             }
-            # Find closest voltage level
             voltage_levels = sorted(cost_per_mile.keys())
             closest_voltage = min(voltage_levels, key=lambda v: abs(v - voltage_kv))
             cost = cost_per_mile[closest_voltage] * distance_miles
-        
         elif self.cost_model == 'capacity_only':
-            # Simple model ignoring distance
             cost = self.line_cost_per_mw * capacity_mw
-        
         else:
-            # Default to capacity_distance
             dist_km = distance_miles / 0.621371
             cost = self.line_cost_per_mw * capacity_mw * (dist_km / 100.0)
-        
         return cost
     
     def build_model(self) -> None:
-        """
-        Build the Pyomo TEP MILP model.
-        
-        Constructs the complete formulation including:
-        - All DC-OPF constraints for existing network
-        - Binary variables for candidate line construction
-        - Big-M constraints for candidate line DC flow
-        - Investment cost terms in objective
-        """
+        """Build the TEP MILP model."""
         self.model = ConcreteModel(name="TEP-MILP")
         
-        # Generate candidates if not provided
         if self.candidate_lines is None:
             self.generate_candidate_lines()
         
-        # =====================================================================
-        # LOAD DATA
-        # =====================================================================
         buses = self.data.get_bus_data()
         branches = self.data.get_branch_data()
         generators = self.data.get_generator_data()
         load = self.data.get_load_by_bus()
         
-        # =====================================================================
-        # INDEX SETS
-        # =====================================================================
         bus_ids = list(buses.index)
         gen_ids = list(generators['GEN UID'])
         branch_ids = list(branches['UID'])
         candidate_ids = list(range(len(self.candidate_lines)))
         
-        self.model.buses = Set(initialize=bus_ids, doc="System buses")
-        self.model.generators = Set(initialize=gen_ids, doc="Generators")
-        self.model.branches = Set(initialize=branch_ids, doc="Existing branches")
-        self.model.candidates = Set(initialize=candidate_ids, doc="Candidate lines")
+        self.model.buses = Set(initialize=bus_ids)
+        self.model.generators = Set(initialize=gen_ids)
+        self.model.branches = Set(initialize=branch_ids)
+        self.model.candidates = Set(initialize=candidate_ids)
         
-        # =====================================================================
-        # EXISTING BRANCH PARAMETERS
-        # =====================================================================
         branch_params = self.data.get_branch_parameters()
         branch_susceptance = {}
         branch_rating = {}
@@ -380,9 +160,6 @@ class TEP:
         self.model.branch_from = Param(self.model.branches, initialize=branch_from)
         self.model.branch_to = Param(self.model.branches, initialize=branch_to)
         
-        # =====================================================================
-        # CANDIDATE LINE PARAMETERS
-        # =====================================================================
         candidate_from = {}
         candidate_to = {}
         candidate_capacity = {}
@@ -402,9 +179,6 @@ class TEP:
         self.model.candidate_cost = Param(self.model.candidates, initialize=candidate_cost)
         self.model.candidate_susceptance = Param(self.model.candidates, initialize=candidate_susceptance)
         
-        # =====================================================================
-        # GENERATOR PARAMETERS
-        # =====================================================================
         gen_to_bus = {}
         gen_pmax = {}
         gen_pmin = {}
@@ -417,7 +191,6 @@ class TEP:
             gen_pmax[gen_id] = gen['PMax MW']
             gen_pmin[gen_id] = gen['PMin MW']
             
-            # Calculate marginal cost from fuel data
             fuel_price = gen['Fuel Price $/MMBTU']
             avg_hr = gen.get('HR_avg_0', 10000)
             if pd.isna(avg_hr):
@@ -429,42 +202,14 @@ class TEP:
         self.model.gen_pmin = Param(self.model.generators, initialize=gen_pmin)
         self.model.gen_cost = Param(self.model.generators, initialize=gen_cost)
         
-        # =====================================================================
-        # LOAD PARAMETER
-        # =====================================================================
         self.model.bus_load = Param(self.model.buses, initialize=load, default=0.0)
         
-        # =====================================================================
-        # DECISION VARIABLES
-        # =====================================================================
+        self.model.p_gen = Var(self.model.generators, domain=NonNegativeReals)
+        self.model.theta = Var(self.model.buses, domain=Reals)
+        self.model.p_flow = Var(self.model.branches, domain=Reals)
+        self.model.p_flow_candidate = Var(self.model.candidates, domain=Reals)
+        self.model.build_line = Var(self.model.candidates, domain=Binary)
         
-        # Continuous operational variables
-        self.model.p_gen = Var(
-            self.model.generators, domain=NonNegativeReals,
-            doc="Generator output (MW)"
-        )
-        self.model.theta = Var(
-            self.model.buses, domain=Reals,
-            doc="Bus voltage angle (rad)"
-        )
-        self.model.p_flow = Var(
-            self.model.branches, domain=Reals,
-            doc="Existing branch flow (MW)"
-        )
-        self.model.p_flow_candidate = Var(
-            self.model.candidates, domain=Reals,
-            doc="Candidate line flow (MW)"
-        )
-        
-        # Binary investment variable: 1 if line is built, 0 otherwise
-        self.model.build_line = Var(
-            self.model.candidates, domain=Binary,
-            doc="Binary: 1 if candidate line is built"
-        )
-        
-        # =====================================================================
-        # OBJECTIVE: Minimize Investment + Operating Cost
-        # =====================================================================
         investment_cost = sum(
             self.model.candidate_cost[c] * self.model.build_line[c] 
             for c in self.model.candidates
@@ -474,28 +219,14 @@ class TEP:
             for g in self.model.generators
         )
         
-        self.model.obj = Objective(
-            expr=investment_cost + operating_cost, 
-            sense=minimize,
-            doc="Minimize investment + operating cost"
-        )
+        self.model.obj = Objective(expr=investment_cost + operating_cost, sense=minimize)
         
-        # =====================================================================
-        # POWER BALANCE CONSTRAINT
-        # Includes flows from both existing and candidate lines
-        # =====================================================================
         def power_balance_rule(m, b):
-            """Power balance including candidate line contributions."""
             gen_at_bus = [g for g in m.generators if m.gen_to_bus[g] == b]
-            
-            # Existing line flows
             flow_in_existing = sum(m.p_flow[br] for br in m.branches if m.branch_to[br] == b)
             flow_out_existing = sum(m.p_flow[br] for br in m.branches if m.branch_from[br] == b)
-            
-            # Candidate line flows (only if built)
             flow_in_candidate = sum(m.p_flow_candidate[c] for c in m.candidates if m.candidate_to[c] == b)
             flow_out_candidate = sum(m.p_flow_candidate[c] for c in m.candidates if m.candidate_from[c] == b)
-            
             return (
                 sum(m.p_gen[g] for g in gen_at_bus) 
                 + flow_in_existing - flow_out_existing
@@ -505,30 +236,16 @@ class TEP:
         
         self.model.power_balance = Constraint(self.model.buses, rule=power_balance_rule)
         
-        # =====================================================================
-        # DC POWER FLOW FOR EXISTING BRANCHES
-        # =====================================================================
         def dc_flow_rule(m, br):
-            """Standard DC power flow for existing lines."""
             return m.p_flow[br] == m.branch_susceptance[br] * (
                 m.theta[m.branch_from[br]] - m.theta[m.branch_to[br]]
             )
         
         self.model.dc_flow = Constraint(self.model.branches, rule=dc_flow_rule)
         
-        # =====================================================================
-        # BIG-M FORMULATION FOR CANDIDATE LINES
-        # This is the key TEP modeling technique
-        # =====================================================================
-        M = 10000  # Big-M constant (must be large enough but not too large)
+        M = 10000
         
         def dc_flow_candidate_upper(m, c):
-            """
-            Upper Big-M constraint for candidate DC flow.
-            
-            If x = 1: f_c ≤ B × Δθ + 0 (binding DC flow)
-            If x = 0: f_c ≤ B × Δθ + M (relaxed - very large upper bound)
-            """
             from_bus = m.candidate_from[c]
             to_bus = m.candidate_to[c]
             susceptance = m.candidate_susceptance[c]
@@ -536,12 +253,6 @@ class TEP:
             return m.p_flow_candidate[c] - susceptance * delta_theta <= M * (1 - m.build_line[c])
         
         def dc_flow_candidate_lower(m, c):
-            """
-            Lower Big-M constraint for candidate DC flow.
-            
-            If x = 1: f_c ≥ B × Δθ - 0 (binding DC flow)
-            If x = 0: f_c ≥ B × Δθ - M (relaxed - very negative lower bound)
-            """
             from_bus = m.candidate_from[c]
             to_bus = m.candidate_to[c]
             susceptance = m.candidate_susceptance[c]
@@ -549,21 +260,9 @@ class TEP:
             return m.p_flow_candidate[c] - susceptance * delta_theta >= -M * (1 - m.build_line[c])
         
         def dc_flow_candidate_zero(m, c):
-            """
-            Zero-flow constraint when not built (upper).
-            
-            If x = 0: f_c ≤ 0
-            If x = 1: f_c ≤ M (not binding)
-            """
             return m.p_flow_candidate[c] <= M * m.build_line[c]
         
         def dc_flow_candidate_zero_lower(m, c):
-            """
-            Zero-flow constraint when not built (lower).
-            
-            If x = 0: f_c ≥ 0
-            If x = 1: f_c ≥ -M (not binding)
-            """
             return m.p_flow_candidate[c] >= -M * m.build_line[c]
         
         self.model.dc_flow_candidate_upper = Constraint(self.model.candidates, rule=dc_flow_candidate_upper)
@@ -571,9 +270,6 @@ class TEP:
         self.model.dc_flow_candidate_zero = Constraint(self.model.candidates, rule=dc_flow_candidate_zero)
         self.model.dc_flow_candidate_zero_lower = Constraint(self.model.candidates, rule=dc_flow_candidate_zero_lower)
         
-        # =====================================================================
-        # GENERATOR LIMITS
-        # =====================================================================
         self.model.gen_max = Constraint(
             self.model.generators,
             rule=lambda m, g: m.p_gen[g] <= m.gen_pmax[g]
@@ -583,9 +279,6 @@ class TEP:
             rule=lambda m, g: m.p_gen[g] >= m.gen_pmin[g]
         )
         
-        # =====================================================================
-        # EXISTING BRANCH FLOW LIMITS
-        # =====================================================================
         self.model.branch_max = Constraint(
             self.model.branches,
             rule=lambda m, br: m.p_flow[br] <= m.branch_rating[br]
@@ -595,43 +288,20 @@ class TEP:
             rule=lambda m, br: m.p_flow[br] >= -m.branch_rating[br]
         )
         
-        # =====================================================================
-        # CANDIDATE LINE FLOW LIMITS (only binding when built)
-        # These couple flow magnitude to the build decision
-        # =====================================================================
         def candidate_flow_max_rule(m, c):
-            """Flow ≤ capacity × build_decision."""
             return m.p_flow_candidate[c] <= m.candidate_capacity[c] * m.build_line[c]
         
         def candidate_flow_min_rule(m, c):
-            """Flow ≥ -capacity × build_decision."""
             return m.p_flow_candidate[c] >= -m.candidate_capacity[c] * m.build_line[c]
         
         self.model.candidate_flow_max = Constraint(self.model.candidates, rule=candidate_flow_max_rule)
         self.model.candidate_flow_min = Constraint(self.model.candidates, rule=candidate_flow_min_rule)
         
-        # =====================================================================
-        # REFERENCE BUS
-        # =====================================================================
         ref_bus = min(bus_ids)
         self.model.ref_bus = Constraint(expr=self.model.theta[ref_bus] == 0)
     
     def solve(self, solver: str = 'gurobi', time_limit: int = 3600) -> bool:
-        """
-        Solve the TEP MILP optimization.
-        
-        Parameters
-        ----------
-        solver : str
-            Solver to use ('gurobi' or 'glpk')
-        time_limit : int
-            Maximum solve time in seconds
-            
-        Returns
-        -------
-        bool
-            True if feasible/optimal solution found
-        """
+        """Solve the TEP MILP optimization."""
         if self.model is None:
             self.build_model()
         
@@ -661,21 +331,7 @@ class TEP:
             return False
     
     def get_results(self) -> Optional[Dict]:
-        """
-        Extract results from solved model.
-        
-        Returns
-        -------
-        dict or None
-            Dictionary containing:
-            - 'objective_value': Total cost ($)
-            - 'investment_cost': Capital expenditure ($)
-            - 'operating_cost': Generation cost ($)
-            - 'lines_built': List of built line details
-            - 'generation': Dict of generator outputs
-            - 'flows': Dict of branch flows
-            - 'congested_branches': List of congested lines
-        """
+        """Extract results from solved model."""
         if self.model is None or self.results is None:
             return None
         

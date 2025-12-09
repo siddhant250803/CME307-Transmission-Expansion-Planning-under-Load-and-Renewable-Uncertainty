@@ -19,22 +19,19 @@ Transmission Expansion Planning (TEP) under load and renewable uncertainty using
 |   |   |-- multi_period_tep.py
 |   |   |-- simplified_multi_period_tep.py
 |   |   |-- scenario_robust_tep.py
-|   |   |-- tep_with_shedding.py
-|   |   `-- example_cost_models.py
+|   |   `-- tep_with_shedding.py
 |   |-- analysis/                    # Diagnostics and plotting
 |   |   |-- analyze_infeasibility.py
-|   |   `-- visualize.py
+|   |   `-- enhanced_visualizations.py
 |   `-- scripts/                     # Entry points
-|       |-- run_baseline.py
+|       |-- main.py
 |       |-- run_tep.py
-|       |-- run_multi_period_tep.py
 |       |-- run_simplified_tep.py
 |       |-- run_load_shedding_analysis.py
 |       |-- run_cost_sensitivity.py
 |       `-- run_robust_tep.py
 |-- results/                         # Output visualizations and tables
 |-- requirements.txt
-|-- RESULTS.md
 `-- README.md
 ```
 
@@ -61,9 +58,15 @@ export GRB_LICENSE_FILE="$(pwd)/gurobi.lic"
 
 ## Usage
 
+### Unified Entry Point (Recommended)
+```bash
+python src/scripts/main.py --all
+```
+Runs all analyses. Use individual flags for specific analyses: `--baseline`, `--tep`, `--multi-period`, `--load-shedding`, `--cost-sensitivity`, `--robust`, `--visualize`.
+
 ### Baseline DC OPF (Static Load)
 ```bash
-python src/scripts/run_baseline.py
+python src/scripts/run_tep.py
 ```
 Deterministic DC power flow minimizing generation cost. No transmission expansion.
 
@@ -79,11 +82,6 @@ python src/scripts/run_simplified_tep.py
 ```
 Two-stage approach: (1) Analyze time series to identify peak congestion periods, (2) Solve TEP for aggregated peak load scenario. Integrates hourly load profiles, wind/PV/hydro variability, and load participation factors.
 
-### Full Multi-Period TEP (License Permitting)
-```bash
-python src/scripts/run_multi_period_tep.py
-```
-Direct MILP across representative periods; may exceed academic WLS limits.
 
 ### Load Shedding Stress Test
 ```bash
@@ -139,7 +137,7 @@ Single build plan that must satisfy multiple load/renewable/outage scenarios; sa
 
 ## Results
 
-See `RESULTS.md` for detailed analysis. Models output:
+Models output results to `results/` directory:
 - Total system cost (investment + operation)
 - Investment costs and payback period
 - Operating costs vs baseline
@@ -147,6 +145,7 @@ See `RESULTS.md` for detailed analysis. Models output:
 - Congestion frequency and severity
 - Period-by-period analysis
 - Robustness under uncertainty
+- Visualizations in `results/plots/`
 
 ## References
 
@@ -154,4 +153,3 @@ See `RESULTS.md` for detailed analysis. Models output:
 2. Conejo et al. (2006). "Decomposition techniques in mathematical programming"
 3. Ruiz & Conejo (2015). "Robust transmission expansion planning"
 4. RTS-GMLC Dataset: https://github.com/GridMod/RTS-GMLC
-
