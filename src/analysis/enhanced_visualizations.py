@@ -92,156 +92,145 @@ def plot_network_enhanced(data_loader, results: Optional[Dict] = None,
                           save_path: Optional[str] = None,
                           title: str = "RTS-GMLC Network Topology",
                           highlight_congested: bool = True) -> plt.Figure:
-    """
-    Create an enhanced network topology visualization.
-    
-    This function creates a detailed map of the power system network showing:
-    - Bus locations (nodes) colored by region
-    - Transmission lines (edges) with width proportional to capacity
-    - Congestion highlighting (red for >90%, orange for >70%)
-    - Generation capacity indicators at major buses
-    
-    Parameters
-    ----------
-    data_loader : RTSDataLoader
-        Instance of the data loader with bus and branch data
-    results : dict, optional
-        Results dictionary containing 'flows' and 'congested_branches'
-    save_path : str, optional
-        Path to save the figure
-    title : str
-        Plot title
-    highlight_congested : bool
-        Whether to highlight congested lines
-        
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The generated figure object
-    """
+    """Create a stunning, detailed network visualization."""
     set_publication_style()
     
     buses = data_loader.get_bus_data()
     branches = data_loader.get_branch_data()
+    generators = data_loader.get_generator_data()
+    
+    # Calculate generation capacity per bus
+    gen_capacity = {}
+    for _, gen in generators.iterrows():
+        bus_id = gen['Bus ID']
+        gen_capacity[bus_id] = gen_capacity.get(bus_id, 0) + gen['PMax MW']
+    
+    # Create figure with white background
+    fig, ax = plt.subplots(figsize=(20, 14), facecolor='white')
+    ax.set_facecolor('#F8F9FA')
     
     # Create graph
     G = nx.Graph()
-    
-    # Node positions from lat/lng
     pos = {}
-    node_colors = []
-    node_sizes = []
-    
-    # Color by region
-    region_colors = {1: '#3498DB', 2: '#E74C3C', 3: '#2ECC71'}
     
     for bus_id in buses.index:
         G.add_node(bus_id)
         if 'lat' in buses.columns and 'lng' in buses.columns:
             pos[bus_id] = (buses.loc[bus_id, 'lng'], buses.loc[bus_id, 'lat'])
-        else:
-            pos[bus_id] = (bus_id % 10, bus_id // 10)
-        
-        region = buses.loc[bus_id, 'Area']
-        node_colors.append(region_colors.get(region, '#95A5A6'))
-        
-        # Size by load
-        load = buses.loc[bus_id, 'MW Load']
-        node_sizes.append(max(80, min(400, load / 1.5)))
     
-    # Process edges
-    edgelist = []
-    edge_colors = []
-    edge_widths = []
-    
+    # Process edges with flow data for heatmap
+    edge_data = []
     for _, branch in branches.iterrows():
         from_bus = int(branch['From Bus'])
         to_bus = int(branch['To Bus'])
         rating = branch['Cont Rating']
         uid = branch['UID']
         
-        edgelist.append((from_bus, to_bus))
         G.add_edge(from_bus, to_bus, rating=rating, uid=uid)
         
-        # Determine edge styling based on flow
-        if results and 'flows' in results and highlight_congested:
+        flow = 0
+        utilization = 0
+        if results and 'flows' in results:
             flow = abs(results['flows'].get(uid, 0))
             utilization = flow / rating if rating > 0 else 0
-            
-            if utilization >= 0.99:
-                edge_colors.append(COLORS['accent'])
-                edge_widths.append(4.5)
-            elif utilization >= 0.70:
-                edge_colors.append(COLORS['warning'])
-                edge_widths.append(3.0)
-            else:
-                edge_colors.append(COLORS['grid'])
-                edge_widths.append(1.2)
-        else:
-            # Width by capacity
-            edge_colors.append(COLORS['secondary'])
-            edge_widths.append(0.6 + (rating / 400))
+        
+        edge_data.append({
+            'edge': (from_bus, to_bus),
+            'uid': uid,
+            'rating': rating,
+            'flow': flow,
+            'utilization': utilization
+        })
     
-    # Create figure
-    fig, ax = plt.subplots(figsize=(16, 11))
+    # Sort edges by utilization for drawing order (low util first, high util on top)
+    edge_data.sort(key=lambda x: x['utilization'])
     
-    # Draw edges first (behind nodes)
-    nx.draw_networkx_edges(
-        G, pos, edgelist=edgelist,
-        edge_color=edge_colors,
-        width=edge_widths,
-        alpha=0.75,
-        ax=ax
-    )
+    # Create colormap for edges (green -> yellow -> red)
+    cmap = plt.cm.RdYlGn_r
     
-    # Draw nodes
-    nx.draw_networkx_nodes(
-        G, pos,
-        node_color=node_colors,
-        node_size=node_sizes,
-        alpha=0.9,
-        edgecolors=COLORS['dark'],
-        linewidths=1.5,
-        ax=ax
-    )
+    # Draw edges with heatmap colors
+    for ed in edge_data:
+        color = cmap(ed['utilization'])
+        width = 1.5 + ed['utilization'] * 6
+        alpha = 0.5 + ed['utilization'] * 0.4
+        
+        x = [pos[ed['edge'][0]][0], pos[ed['edge'][1]][0]]
+        y = [pos[ed['edge'][0]][1], pos[ed['edge'][1]][1]]
+        ax.plot(x, y, color=color, linewidth=width, alpha=alpha, solid_capstyle='round', zorder=1)
     
-    # Add labels for major buses (high load or generation)
-    labels = {}
+    # Draw new transmission lines from robust TEP (thick, bold)
+    new_lines = [(101, 106), (101, 117)]
+    for from_bus, to_bus in new_lines:
+        if from_bus in pos and to_bus in pos:
+            x = [pos[from_bus][0], pos[to_bus][0]]
+            y = [pos[from_bus][1], pos[to_bus][1]]
+            # Shadow effect
+            ax.plot(x, y, color='#2C3E50', linewidth=14, alpha=0.3, solid_capstyle='round', zorder=2)
+            ax.plot(x, y, color='#E74C3C', linewidth=10, alpha=0.8, solid_capstyle='round', zorder=3)
+            ax.plot(x, y, color='#C0392B', linewidth=6, alpha=1.0, solid_capstyle='round', zorder=4)
+    
+    # Node styling - bolder colors for white background
+    region_colors = {1: '#3498DB', 2: '#E74C3C', 3: '#27AE60'}
+    
+    for bus_id in buses.index:
+        region = buses.loc[bus_id, 'Area']
+        load = buses.loc[bus_id, 'MW Load']
+        cap = gen_capacity.get(bus_id, 0)
+        
+        # Size based on load (larger = more load)
+        size = max(120, min(900, load * 1.8))
+        
+        # Color by region
+        color = region_colors.get(region, '#95A5A6')
+        
+        # Main node with dark edge
+        ax.scatter(pos[bus_id][0], pos[bus_id][1], s=size, c=color, 
+                  edgecolors='#2C3E50', linewidths=2, alpha=0.9, zorder=6)
+        
+        # Generation capacity ring (if has generation)
+        if cap > 100:
+            ring_size = size * 2
+            ax.scatter(pos[bus_id][0], pos[bus_id][1], s=ring_size, facecolors='none',
+                      edgecolors='#F39C12', linewidths=3, alpha=0.8, zorder=5)
+    
+    # Highlight key buses (101, 106, 117) with labels
+    key_buses = {101: 'Hub 101\n(New Lines)', 106: 'Bus 106', 117: 'Bus 117'}
+    for bus_id, label in key_buses.items():
+        if bus_id in pos:
+            # Highlight ring
+            ax.scatter(pos[bus_id][0], pos[bus_id][1], s=1500, facecolors='none',
+                      edgecolors='#F39C12', linewidths=5, alpha=0.95, zorder=7)
+            # Label with larger font
+            ax.annotate(label, pos[bus_id], xytext=(12, 12), textcoords='offset points',
+                       fontsize=14, fontweight='bold', color='white',
+                       bbox=dict(boxstyle='round,pad=0.4', facecolor='#C0392B', 
+                                edgecolor='#2C3E50', alpha=0.95, linewidth=2),
+                       zorder=10)
+    
+    # Label high-load buses with larger font
     for bus_id in buses.index:
         load = buses.loc[bus_id, 'MW Load']
-        if load > 200 or bus_id % 100 in [13, 18, 21, 22, 23]:
-            labels[bus_id] = str(bus_id)
+        if load > 300 and bus_id not in key_buses:
+            ax.annotate(str(bus_id), pos[bus_id], fontsize=11, fontweight='bold',
+                       color='#2C3E50', ha='center', va='center', zorder=8)
     
-    nx.draw_networkx_labels(
-        G, pos, labels,
-        font_size=11,
-        font_weight='bold',
-        font_color=COLORS['dark'],
-        ax=ax
+    # Info box only
+    info_text = (
+        "RTS-GMLC Power System\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "73 Buses | 120 Lines | 158 Generators\n"
+        "Total Load: 8,550 MW\n"
+        "Congested: A27, CA-1, CB-1\n"
+        "New Lines: 101→106, 101→117"
     )
+    ax.text(0.98, 0.02, info_text, transform=ax.transAxes, fontsize=14,
+           verticalalignment='bottom', horizontalalignment='right',
+           fontfamily='monospace', color='#2C3E50', fontweight='bold',
+           bbox=dict(boxstyle='round,pad=0.6', facecolor='white', 
+                    edgecolor='#F39C12', alpha=0.95, linewidth=3))
     
-    # Create legend with larger fonts
-    legend_elements = [
-        mpatches.Patch(color=region_colors[1], label='Region 1'),
-        mpatches.Patch(color=region_colors[2], label='Region 2'),
-        mpatches.Patch(color=region_colors[3], label='Region 3'),
-    ]
-    
-    if highlight_congested and results:
-        legend_elements.extend([
-            Line2D([0], [0], color=COLORS['accent'], linewidth=4, label='>99% Utilized'),
-            Line2D([0], [0], color=COLORS['warning'], linewidth=3, label='>70% Utilized'),
-            Line2D([0], [0], color=COLORS['grid'], linewidth=1.5, label='Normal'),
-        ])
-    
-    legend = ax.legend(handles=legend_elements, loc='upper left', framealpha=0.95,
-                       fontsize=13, title='Legend', title_fontsize=14)
-    legend.get_title().set_fontweight('bold')
-    
-    ax.set_title(title, fontsize=20, fontweight='bold', pad=20)
-    ax.set_xlabel('Longitude', fontsize=16, fontweight='bold')
-    ax.set_ylabel('Latitude', fontsize=16, fontweight='bold')
-    ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True, labelsize=12)
+    # Remove axes, no title
+    ax.axis('off')
     
     plt.tight_layout()
     
@@ -885,82 +874,152 @@ def plot_robust_scenarios_enhanced(results_dir: Path,
 def create_summary_dashboard(results_dir: Path, data_loader,
                               baseline_results: Dict,
                               output_path: Optional[str] = None) -> plt.Figure:
-    """
-    Create a comprehensive summary dashboard with key metrics.
-    
-    Parameters
-    ----------
-    results_dir : Path
-        Directory containing result CSV files
-    data_loader : RTSDataLoader
-        Data loader instance
-    baseline_results : dict
-        Baseline DC-OPF results
-    output_path : str, optional
-        Path to save the figure
-        
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The generated figure object
-    """
+    """Create a comprehensive summary dashboard with key metrics."""
     set_publication_style()
     
-    fig = plt.figure(figsize=(18, 14))
+    fig = plt.figure(figsize=(20, 14))
     
-    # Create grid layout
-    gs = fig.add_gridspec(3, 3, hspace=0.4, wspace=0.35)
+    # Create grid layout: 3 rows, 4 columns
+    gs = fig.add_gridspec(3, 4, hspace=0.35, wspace=0.3, 
+                          height_ratios=[0.8, 1.4, 1], width_ratios=[1, 1, 1, 1])
     
-    # 1. Key Metrics Panel (top left)
-    ax_metrics = fig.add_subplot(gs[0, 0])
+    # =========================================================================
+    # TOP ROW: Key Metrics + Scenario Comparison
+    # =========================================================================
+    
+    # 1. Key Metrics Panel (top left, spans 2 cols)
+    ax_metrics = fig.add_subplot(gs[0, 0:2])
     ax_metrics.axis('off')
     
-    metrics_text = """
-    KEY METRICS
-    ━━━━━━━━━━━━━━━━━━━
-    System Buses: 73
-    Generators: 158  
-    Branches: 120
-    
-    Base Load: 8,550 MW
-    Operating Cost: $138,967
-    Congested Lines: 3
-    
-    Lines Built: 0 (Deterministic)
-    Lines Built: 2 (Robust)
-    """
-    ax_metrics.text(0.1, 0.95, metrics_text, transform=ax_metrics.transAxes,
-                   fontsize=13, verticalalignment='top', fontfamily='monospace',
+    metrics_text = """KEY METRICS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+System Buses: 73    |  Generators: 158  |  Branches: 120
+Base Load: 8,550 MW |  Operating Cost: $138,967
+
+Congested Lines: A27, CA-1, CB-1
+Robust TEP Lines: Bus 101 → 106, Bus 101 → 117"""
+    ax_metrics.text(0.02, 0.9, metrics_text, transform=ax_metrics.transAxes,
+                   fontsize=11, verticalalignment='top', fontfamily='monospace',
                    fontweight='bold',
                    bbox=dict(boxstyle='round', facecolor=COLORS['light'], 
                             edgecolor=COLORS['grid'], linewidth=2))
     
-    # 2. Network mini-plot (top center & right)
-    ax_network = fig.add_subplot(gs[0, 1:])
+    # 2. Scenario Comparison (top right, spans 2 cols)
+    ax_scenario = fig.add_subplot(gs[0, 2:4])
+    robust_file = results_dir / "robust_tep_summary.csv"
+    if robust_file.exists():
+        df = pd.read_csv(robust_file)
+        x = np.arange(len(df))
+        width = 0.35
+        
+        bars1 = ax_scenario.bar(x - width/2, df["total_load_mw"], width, 
+                               label='System Load (MW)', color=COLORS['secondary'], 
+                               edgecolor=COLORS['dark'], linewidth=1.5)
+        
+        ax2 = ax_scenario.twinx()
+        bars2 = ax2.bar(x + width/2, df["operating_cost"]/1000, width,
+                       label='Operating Cost ($k)', color=COLORS['accent'], 
+                       edgecolor=COLORS['dark'], linewidth=1.5)
+        
+        ax_scenario.set_xticks(x)
+        scenario_labels = ['Base', 'High Load\nLow Renew', 'Low Load\nHigh Renew']
+        ax_scenario.set_xticklabels(scenario_labels, fontsize=10, fontweight='bold')
+        ax_scenario.set_ylabel('System Load (MW)', fontsize=11, fontweight='bold', color=COLORS['secondary'])
+        ax2.set_ylabel('Operating Cost ($k)', fontsize=11, fontweight='bold', color=COLORS['accent'])
+        ax_scenario.tick_params(axis='y', labelcolor=COLORS['secondary'], labelsize=10)
+        ax2.tick_params(axis='y', labelcolor=COLORS['accent'], labelsize=10)
+        
+        # Add value labels
+        for bar, val in zip(bars1, df["total_load_mw"]):
+            ax_scenario.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 100, 
+                           f'{val:,.0f}\nMW', ha='center', va='bottom', fontsize=9, fontweight='bold')
+        for bar, val in zip(bars2, df["operating_cost"]/1000):
+            ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5, 
+                    f'${val:,.0f}k', ha='center', va='bottom', fontsize=9, fontweight='bold', color=COLORS['accent'])
+        
+        ax_scenario.legend(loc='upper left', fontsize=9)
+        ax2.legend(loc='upper right', fontsize=9)
+    ax_scenario.set_title('Scenario Comparison: Load & Operating Cost', fontsize=14, fontweight='bold')
+    
+    # =========================================================================
+    # MIDDLE ROW: Large Network (spans all 4 columns)
+    # =========================================================================
+    
+    ax_network = fig.add_subplot(gs[1, :])
     buses = data_loader.get_bus_data()
     branches = data_loader.get_branch_data()
     
     G = nx.Graph()
     pos = {}
+    loads = {}
     for bus_id in buses.index:
         G.add_node(bus_id)
         if 'lat' in buses.columns:
             pos[bus_id] = (buses.loc[bus_id, 'lng'], buses.loc[bus_id, 'lat'])
+        loads[bus_id] = buses.loc[bus_id, 'MW Load']
     
     for _, branch in branches.iterrows():
-        G.add_edge(int(branch['From Bus']), int(branch['To Bus']))
+        G.add_edge(int(branch['From Bus']), int(branch['To Bus']), 
+                  uid=branch['UID'], rating=branch['Cont Rating'])
     
-    region_colors = {1: '#3498DB', 2: '#E74C3C', 3: '#2ECC71'}
-    node_colors = [region_colors.get(buses.loc[b, 'Area'], '#95A5A6') for b in buses.index]
+    # Node sizes based on load (scaled larger)
+    max_load = max(loads.values()) if loads.values() else 1
+    node_sizes = [max(80, 400 * loads.get(b, 0) / max_load) for b in buses.index]
     
-    nx.draw_networkx(G, pos, ax=ax_network, node_color=node_colors, 
-                    node_size=50, with_labels=False, edge_color=COLORS['grid'],
-                    alpha=0.7, width=0.8)
-    ax_network.set_title('Network Topology (3 Regions)', fontsize=18, fontweight='bold')
+    region_colors_map = {1: '#3498DB', 2: '#E74C3C', 3: '#2ECC71'}
+    node_colors = [region_colors_map.get(buses.loc[b, 'Area'], '#95A5A6') for b in buses.index]
+    
+    # Draw edges
+    congested_uids = {'A27', 'CA-1', 'CB-1'}
+    regular_edges = [(u, v) for u, v, d in G.edges(data=True) if d.get('uid') not in congested_uids]
+    congested_edges = [(u, v) for u, v, d in G.edges(data=True) if d.get('uid') in congested_uids]
+    
+    nx.draw_networkx_edges(G, pos, edgelist=regular_edges, ax=ax_network, 
+                          edge_color=COLORS['grid'], alpha=0.4, width=1.2)
+    nx.draw_networkx_edges(G, pos, edgelist=congested_edges, ax=ax_network, 
+                          edge_color=COLORS['accent'], alpha=0.95, width=4)
+    
+    # Draw nodes
+    nx.draw_networkx_nodes(G, pos, ax=ax_network, node_color=node_colors, 
+                          node_size=node_sizes, alpha=0.85, edgecolors='white', linewidths=1)
+    
+    # Draw new transmission lines (101→106, 101→117)
+    new_lines = [(101, 106), (101, 117)]
+    for from_bus, to_bus in new_lines:
+        if from_bus in pos and to_bus in pos:
+            ax_network.annotate('', xy=pos[to_bus], xytext=pos[from_bus],
+                               arrowprops=dict(arrowstyle='-|>', color='#C0392B', lw=5, 
+                                              mutation_scale=20))
+    
+    # Label key buses with larger circles
+    key_buses = {101: '101', 106: '106', 117: '117'}
+    for bus_id, label in key_buses.items():
+        if bus_id in pos:
+            ax_network.annotate(label, pos[bus_id], fontsize=11, fontweight='bold',
+                               ha='center', va='center', color='white',
+                               bbox=dict(boxstyle='circle', facecolor='#F39C12', 
+                                        edgecolor='#E67E22', pad=0.4, linewidth=2))
+    
+    # Legend
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#3498DB', markersize=14, label='Region 1'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#E74C3C', markersize=14, label='Region 2'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#2ECC71', markersize=14, label='Region 3'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#F39C12', markersize=14, label='Key Buses'),
+        Line2D([0], [0], color=COLORS['accent'], linewidth=4, label='Congested Lines'),
+        Line2D([0], [0], color='#C0392B', linewidth=5, label='NEW LINES (200 MW each)'),
+    ]
+    ax_network.legend(handles=legend_elements, loc='upper left', fontsize=11, 
+                     framealpha=0.95, title='Network Legend', title_fontsize=12)
+    ax_network.set_title('Network: Load Distribution, Congestion & Expansion', fontsize=16, fontweight='bold')
     ax_network.axis('off')
     
-    # 3. Generation Mix (middle left) - TREEMAP
-    ax_gen = fig.add_subplot(gs[1, 0])
+    # =========================================================================
+    # BOTTOM ROW: Generation Mix + Load Shedding panels
+    # =========================================================================
+    
+    # 3. Generation Mix - TREEMAP
+    ax_gen = fig.add_subplot(gs[2, 0])
     if 'generation' in baseline_results:
         import squarify
         generators = data_loader.get_generator_data()
@@ -974,11 +1033,8 @@ def create_summary_dashboard(results_dir: Path, data_loader,
         
         if gen_by_type:
             total = sum(gen_by_type.values())
-            # Separate large (>=5%) and small (<5%) categories
             large_types = {t: p for t, p in gen_by_type.items() if p/total >= 0.05}
             small_types = {t: p for t, p in gen_by_type.items() if p/total < 0.05}
-            
-            # Combine small types into "Others"
             if small_types:
                 large_types['Others'] = sum(small_types.values())
             
@@ -991,71 +1047,47 @@ def create_summary_dashboard(results_dir: Path, data_loader,
             squarify.plot(sizes=powers, label=labels, color=colors, alpha=0.85,
                          ax=ax_gen, text_kwargs={'fontsize': 9, 'fontweight': 'bold'})
             ax_gen.axis('off')
-    ax_gen.set_title('Generation Mix', fontsize=18, fontweight='bold')
+    ax_gen.set_title('Generation Mix', fontsize=14, fontweight='bold')
     
-    # 4. Congestion (middle center)
-    ax_cong = fig.add_subplot(gs[1, 1])
-    if 'congested_branches' in baseline_results and baseline_results['congested_branches']:
-        congested = baseline_results['congested_branches'][:5]
-        branches_list = [c['branch'][:10] for c in congested]
-        utils = [abs(c['flow'])/c['rating']*100 for c in congested]
-        colors = [COLORS['accent'] if u >= 99 else COLORS['warning'] for u in utils]
-        ax_cong.barh(range(len(branches_list)), utils, color=colors)
-        ax_cong.set_yticks(range(len(branches_list)))
-        ax_cong.set_yticklabels(branches_list, fontsize=11, fontweight='bold')
-        ax_cong.axvline(x=100, color='black', linestyle='--', linewidth=2)
-        ax_cong.set_xlim(0, 108)
-    ax_cong.set_title('Top Congested Lines (%)', fontsize=18, fontweight='bold')
-    ax_cong.set_xlabel('Utilization %', fontsize=14, fontweight='bold')
-    ax_cong.tick_params(axis='x', labelsize=12)
-    
-    # 5. Cost Sensitivity Summary (middle right)
-    ax_cost = fig.add_subplot(gs[1, 2])
-    cost_file = results_dir / "cost_sensitivity.csv"
-    if cost_file.exists():
-        df = pd.read_csv(cost_file)
-        ax_cost.semilogx(df["cost_per_mw"], df["operating_cost"]/1000, 
-                        marker='o', color=COLORS['primary'], linewidth=3, markersize=10)
-        ax_cost.axhline(df["operating_cost"].iloc[0]/1000, color=COLORS['warning'], 
-                       linestyle='--', linewidth=2.5, label='Baseline')
-        ax_cost.set_xlabel('Line Cost ($/MW)', fontsize=14, fontweight='bold')
-        ax_cost.set_ylabel('Op. Cost ($k)', fontsize=14, fontweight='bold')
-        ax_cost.legend(fontsize=12)
-        ax_cost.tick_params(labelsize=12)
-    ax_cost.set_title('Cost Sensitivity', fontsize=18, fontweight='bold')
-    
-    # 6. Load Shedding (bottom left)
-    ax_shed = fig.add_subplot(gs[2, 0])
+    # 4. Supply-Demand Gap (spans 2 cols)
+    ax_gap = fig.add_subplot(gs[2, 1:3])
     shed_file = results_dir / "load_shedding_periods.csv"
     if shed_file.exists():
         df = pd.read_csv(shed_file)
-        ax_shed.bar(df["period"], df["load_shed_pct"], color=COLORS['accent'], 
-                   edgecolor=COLORS['dark'], linewidth=1)
-        ax_shed.set_xlabel('Period', fontsize=14, fontweight='bold')
-        ax_shed.set_ylabel('Load Shed (%)', fontsize=14, fontweight='bold')
-        ax_shed.tick_params(labelsize=12)
-    ax_shed.set_title('Load Shedding Stress Test', fontsize=18, fontweight='bold')
-    
-    # 7. Robust Scenarios (bottom center & right)
-    ax_robust = fig.add_subplot(gs[2, 1:])
-    robust_file = results_dir / "robust_tep_summary.csv"
-    if robust_file.exists():
-        df = pd.read_csv(robust_file)
         x = np.arange(len(df))
         width = 0.35
-        ax_robust.bar(x - width/2, df["total_load_mw"], width, 
-                     label='Load (MW)', color=COLORS['secondary'], edgecolor=COLORS['dark'])
-        ax_robust.bar(x + width/2, df["total_generation_mw"], width,
-                     label='Generation (MW)', color=COLORS['success'], edgecolor=COLORS['dark'])
-        ax_robust.set_xticks(x)
-        ax_robust.set_xticklabels(df["scenario"], rotation=15, fontsize=12, fontweight='bold')
-        ax_robust.legend(fontsize=12)
-        ax_robust.set_ylabel('MW', fontsize=14, fontweight='bold')
-        ax_robust.tick_params(axis='y', labelsize=12)
-    ax_robust.set_title('Robust TEP Scenario Comparison', fontsize=18, fontweight='bold')
+        ax_gap.bar(x - width/2, df["total_load_mw"], width, label='Total Load', 
+                  color=COLORS['accent'], edgecolor=COLORS['dark'], alpha=0.8)
+        ax_gap.bar(x + width/2, df["total_generation_mw"], width, label='Generation',
+                  color=COLORS['success'], edgecolor=COLORS['dark'], alpha=0.8)
+        ax_gap.set_xticks(x)
+        ax_gap.set_xticklabels(df["period"], fontsize=10)
+        ax_gap.set_xlabel('Period', fontsize=12, fontweight='bold')
+        ax_gap.set_ylabel('Power (MW)', fontsize=12, fontweight='bold')
+        ax_gap.legend(fontsize=10, loc='upper left')
+        ax_gap.tick_params(labelsize=10)
+    ax_gap.set_title('Supply-Demand Gap Under Stress', fontsize=14, fontweight='bold')
+    
+    # 5. Load Shedding & Cost
+    ax_shed = fig.add_subplot(gs[2, 3])
+    if shed_file.exists():
+        df = pd.read_csv(shed_file)
+        color_scale = plt.cm.Reds(np.linspace(0.3, 0.9, len(df)))
+        ax_shed.bar(df["period"], df["load_shed_pct"], color=color_scale, 
+                   edgecolor=COLORS['dark'], linewidth=1)
+        ax_shed.set_xlabel('Period', fontsize=12, fontweight='bold')
+        ax_shed.set_ylabel('Load Shed (%)', fontsize=12, fontweight='bold', color=COLORS['accent'])
+        ax_shed.tick_params(labelsize=9)
+        
+        ax_cost = ax_shed.twinx()
+        ax_cost.plot(df["period"], df["load_shed_cost"]/1e6, 'o-', color=COLORS['primary'], 
+                    linewidth=2, markersize=4)
+        ax_cost.set_ylabel('Penalty Cost ($M)', fontsize=11, fontweight='bold', color=COLORS['primary'])
+        ax_cost.tick_params(axis='y', labelcolor=COLORS['primary'], labelsize=9)
+    ax_shed.set_title('Load Shedding & Penalty Cost', fontsize=14, fontweight='bold')
     
     fig.suptitle('CME307 Transmission Expansion Planning - Results Summary',
-                fontsize=22, fontweight='bold', y=0.98)
+                fontsize=20, fontweight='bold', y=0.98)
     
     if output_path:
         fig.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
