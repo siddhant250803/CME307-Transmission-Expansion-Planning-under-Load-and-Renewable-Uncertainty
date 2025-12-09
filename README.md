@@ -148,8 +148,4 @@ Models output results to `results/` directory:
 - Visualizations in `results/plots/`
 
 ## References
-
-1. Garver, L. L. (1970). "Transmission network estimation using linear programming"
-2. Conejo et al. (2006). "Decomposition techniques in mathematical programming"
-3. Ruiz & Conejo (2015). "Robust transmission expansion planning"
-4. RTS-GMLC Dataset: https://github.com/GridMod/RTS-GMLC
+1. RTS-GMLC Dataset: https://github.com/GridMod/RTS-GMLC
